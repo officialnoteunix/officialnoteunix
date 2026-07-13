@@ -41,3 +41,6 @@ run.cmd
 run.ps1
 start_backend.bat
 start_frontend.bat
+
+# Internal docs
+TESTING_GUIDE.md
