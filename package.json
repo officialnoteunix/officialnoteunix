@@ -1,0 +1,28 @@
+{
+  "name": "noteunix",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo run build",
+    "start": "npm run build -w @noteunix/frontend && npx cross-env NODE_ENV=production node packages/backend/src/server.js",
+    "lint": "turbo lint",
+    "test": "npm run test -w @noteunix/backend"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.7.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.5",
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "packageManager": "npm@10.5.0"
+}
