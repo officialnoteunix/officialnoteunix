@@ -14,7 +14,8 @@ export function uploadBuffer(buffer, options = {}) {
 
 export async function uploadFiles(uploadedFiles, folder = 'noteunix/notes') {
   return Promise.all(uploadedFiles.map(async (f) => {
-    const result = await uploadBuffer(f.buffer, { folder });
+    const isImage = f.mimetype?.startsWith('image/');
+    const result = await uploadBuffer(f.buffer, { folder, resourceType: isImage ? 'auto' : 'raw' });
     return {
       url: result.secure_url,
       fileType: MIME_TO_EXT[f.mimetype] || 'bin',
