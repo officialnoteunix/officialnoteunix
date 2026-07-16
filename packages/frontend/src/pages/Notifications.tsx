@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CheckCircle, XCircle, MessageCircle, Shield, UserPlus, FileText, Lock,
+  CheckCircle, XCircle, MessageCircle, Shield, UserPlus, FileText, Lock, Bell, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { notificationApi } from '../api/notification';
 import { useAuth } from '../context/AuthContext';
 import { useNotificationCount } from '../context/NotificationContext';
-import Pagination from '../components/ui/Pagination';
 
 const TYPE_ICONS: Record<string, typeof CheckCircle> = {
   note_approved: CheckCircle,
@@ -19,7 +18,7 @@ const TYPE_ICONS: Record<string, typeof CheckCircle> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  note_approved: 'var(--secondary)',
+  note_approved: 'var(--primary)',
   note_rejected: 'var(--danger)',
   new_comment: 'var(--primary)',
   report_resolved: 'var(--warning)',
@@ -27,6 +26,8 @@ const TYPE_COLORS: Record<string, string> = {
   note_uploaded: 'var(--text-muted)',
   password_changed: 'var(--text-muted)',
 };
+
+const ITEMS_PER_PAGE = 5;
 
 function getTimeAgo(date: string): string {
   const now = Date.now();
@@ -37,8 +38,40 @@ function getTimeAgo(date: string): string {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
+  if (days === 1) return 'Yesterday';
   if (days < 7) return `${days}d ago`;
-  return new Date(date).toLocaleDateString();
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getDateGroup(date: string): string {
+  const now = new Date();
+  const d = new Date(date);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  if (d >= today) return 'Today';
+  if (d >= yesterday) return 'Yesterday';
+  if (d >= weekAgo) return 'This Week';
+  return 'Earlier';
+}
+
+const GROUP_ORDER = ['Today', 'Yesterday', 'This Week', 'Earlier'];
+
+function SectionPagination({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="notif-pagination">
+      <button className="notif-page-btn" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+        <ChevronLeft size={14} />
+      </button>
+      <span className="notif-page-info">{page}/{totalPages}</span>
+      <button className="notif-page-btn" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
+        <ChevronRight size={14} />
+      </button>
+    </div>
+  );
 }
 
 export default function Notifications() {
@@ -46,20 +79,15 @@ export default function Notifications() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const { unreadCount, refreshCount } = useNotificationCount();
+  const [groupPages, setGroupPages] = useState<Record<string, number>>({});
 
-  const fetchNotifications = useCallback(async (p = 1) => {
+  const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await notificationApi.list({ page: p, limit: 20 });
+      const res = await notificationApi.list({ limit: 100 });
       const items = res.data.data.items || res.data.data;
       setNotifications(items);
-      setTotalPages(res.data.data.totalPages || 1);
-      setTotal(res.data.data.total || items.length);
-      setPage(p);
       refreshCount();
     } catch { /* ignore */ }
     finally { setLoading(false); }
@@ -87,109 +115,121 @@ export default function Notifications() {
         refreshCount();
       } catch { /* ignore */ }
     }
-    if (notification.link) navigate(notification.link);
+    if (notification.link) {
+      const url = notification.link;
+      if (url.startsWith('http')) window.open(url, '_blank');
+      else navigate(url);
+    }
+  };
+
+  const setGroupPage = (group: string, page: number) => {
+    setGroupPages(prev => ({ ...prev, [group]: page }));
+  };
+
+  const grouped = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const n of notifications) {
+      const group = getDateGroup(n.createdAt);
+      if (!map[group]) map[group] = [];
+      map[group].push(n);
+    }
+    return GROUP_ORDER.filter(g => map[g]).map(g => ({ label: g, items: map[g] }));
+  }, [notifications]);
+
+  const leftGroups = grouped.filter(g => g.label === 'Today');
+  const rightGroups = grouped.filter(g => g.label !== 'Today');
+
+  const renderNotification = (n: any) => {
+    const Icon = TYPE_ICONS[n.type] || FileText;
+    const iconColor = TYPE_COLORS[n.type] || 'var(--text-muted)';
+    return (
+      <div
+        key={n._id}
+        className={`notif-item ${!n.read ? 'notif-item--unread' : ''}`}
+        onClick={() => handleClick(n)}
+      >
+        <div className="notif-item-icon" style={{ color: iconColor }}>
+          <Icon size={16} />
+        </div>
+        <div className="notif-item-content">
+          <div className="notif-item-text">
+            <span className="notif-item-title">{n.title}</span>
+            <span className="notif-item-dot">·</span>
+            <span className="notif-item-message">{n.message}</span>
+          </div>
+          <div className="notif-item-time">{getTimeAgo(n.createdAt)}</div>
+        </div>
+        {!n.read && <div className="notif-item-unread" />}
+      </div>
+    );
+  };
+
+  const renderSection = (group: { label: string; items: any[] }) => {
+    const page = groupPages[group.label] || 1;
+    const totalPages = Math.max(1, Math.ceil(group.items.length / ITEMS_PER_PAGE));
+    const pageItems = group.items.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+    return (
+      <div key={group.label} className="notif-section">
+        <div className="notif-section-header">
+          <span className="notif-section-label">{group.label}</span>
+          <span className="notif-section-count">{group.items.length}</span>
+        </div>
+        <div className="notif-list">
+          {pageItems.map(renderNotification)}
+        </div>
+        <SectionPagination page={page} totalPages={totalPages} onPageChange={(p) => setGroupPage(group.label, p)} />
+      </div>
+    );
   };
 
   if (!user) {
     return (
-      <div style={{ padding: '100px 5% 60px', maxWidth: 800, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>Notifications</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Please log in to view notifications.</p>
+      <div className="notif-page">
+        <h1 className="notif-title">Notifications</h1>
+        <p className="notif-subtitle">Please log in to view notifications.</p>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '100px 5% 60px', maxWidth: 800, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+    <div className="notif-page">
+      <div className="notif-header">
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>Notifications</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-            {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}` : 'All caught up!'}
+          <h1 className="notif-title">Notifications</h1>
+          <p className="notif-subtitle">
+            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
           </p>
         </div>
         {unreadCount > 0 && (
-          <button
-            className="btn-rounded btn-ghost"
-            style={{ padding: '8px 16px', fontSize: 13 }}
-            onClick={handleMarkAllRead}
-          >
-            Mark all as read
+          <button className="notif-mark-btn" onClick={handleMarkAllRead}>
+            Mark all read
           </button>
         )}
       </div>
 
       {loading ? (
-        <div className="loading-screen" style={{ minHeight: 300 }}>
+        <div className="loading-screen" style={{ minHeight: 200 }}>
           <div className="spinner" />
         </div>
       ) : notifications.length === 0 ? (
-        <div style={{
-          background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-md)', padding: 60, textAlign: 'center',
-        }}>
-          <CheckCircle size={40} style={{ color: 'var(--text-light)', marginBottom: 16 }} />
-          <h3 style={{ fontSize: 16, marginBottom: 4 }}>No notifications</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-            You'll see updates about your notes and account here.
-          </p>
+        <div className="notif-empty">
+          <Bell size={20} />
+          <span>No notifications</span>
         </div>
       ) : (
-        <>
-          <div style={{
-            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-md)', overflow: 'hidden',
-          }}>
-            {notifications.map((n, i) => {
-              const Icon = TYPE_ICONS[n.type] || FileText;
-              const iconColor = TYPE_COLORS[n.type] || 'var(--text-muted)';
-              return (
-                <div
-                  key={n._id}
-                  onClick={() => handleClick(n)}
-                  style={{
-                    display: 'flex', gap: 14, alignItems: 'flex-start',
-                    padding: '14px 20px',
-                    borderBottom: i < notifications.length - 1 ? '1px solid var(--border-color)' : 'none',
-                    cursor: n.link ? 'pointer' : 'default',
-                    background: n.read ? 'transparent' : 'var(--primary-light)',
-                    transition: 'background 0.2s',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-subtle)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = n.read ? 'transparent' : 'var(--primary-light)')}
-                >
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 'var(--radius-full)',
-                    background: 'var(--bg-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0, color: iconColor,
-                  }}>
-                    <Icon size={16} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: n.read ? 400 : 700, fontSize: 14, marginBottom: 2 }}>
-                      {n.title}
-                    </div>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      {n.message}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-light)' }}>
-                      {getTimeAgo(n.createdAt)}
-                    </div>
-                  </div>
-                  {!n.read && (
-                    <div style={{
-                      width: 8, height: 8, borderRadius: 'var(--radius-full)',
-                      background: 'var(--primary)', flexShrink: 0, marginTop: 6,
-                    }} />
-                  )}
-                </div>
-              );
-            })}
+        <div className="notif-columns">
+          <div className="notif-col">
+            {leftGroups.length > 0 ? leftGroups.map(renderSection) : (
+              <div className="notif-empty-inline">No activity today</div>
+            )}
           </div>
-          <div style={{ marginTop: 20 }}>
-            <Pagination page={page} totalPages={totalPages} total={total} onPageChange={fetchNotifications} />
+          <div className="notif-col">
+            {rightGroups.length > 0 ? rightGroups.map(renderSection) : (
+              <div className="notif-empty-inline">No older notifications</div>
+            )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

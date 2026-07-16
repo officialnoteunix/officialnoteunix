@@ -21,7 +21,6 @@ const UniversityDetail = lazy(() => import('./pages/UniversityDetail'));
 const CourseDetail = lazy(() => import('./pages/CourseDetail'));
 const SemesterDetail = lazy(() => import('./pages/SemesterDetail'));
 const SubjectDetail = lazy(() => import('./pages/SubjectDetail'));
-const SearchResults = lazy(() => import('./pages/SearchResults'));
 const Leaderboard = lazy(() => import('./pages/Leaderboard'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Privacy = lazy(() => import('./pages/Privacy'));
@@ -70,9 +69,7 @@ export default function App() {
           <Route path="/courses/:id" element={<CourseDetail />} />
           <Route path="/semesters/:id" element={<SemesterDetail />} />
           <Route path="/subjects/:id" element={<SubjectDetail />} />
-          <Route path="/search" element={<SearchResults />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
-          <Route path="/notifications" element={<Notifications />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/contact" element={<Contact />} />
@@ -126,6 +123,7 @@ export default function App() {
           <Route path="messages" element={<AdminMessages />} />
           <Route path="audit-logs" element={<AdminAuditLogs />} />
           <Route path="mail" element={<AdminMail />} />
+          <Route path="notifications" element={<Notifications />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

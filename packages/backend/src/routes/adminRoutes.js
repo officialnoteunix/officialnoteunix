@@ -13,12 +13,13 @@ import Comment from '../models/Comment.js';
 import Notification from '../models/Notification.js';
 import AuditLog from '../models/AuditLog.js';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { sendNoteApprovedEmail, sendCustomEmail, isEmailEnabled, sendContactReplyEmail } from '../config/email.js';
+import { sendCustomEmail, isEmailEnabled, getEmailRetryInfo } from '../config/email.js';
 import { validate } from '../middleware/validate.js';
 import { upload, validatePdfBuffer } from '../middleware/upload.js';
-import { createNoteSchema } from '../validators/noteValidator.js';
-import cloudinary from '../config/cloudinary.js';
+import { createNoteSchema, updateNoteSchema } from '../validators/noteValidator.js';
 import { safeLimit, safePage } from '../utils/constants.js';
+import { uploadFiles, uploadThumbnail, deleteFile, deleteNoteFiles, extractPublicId } from '../utils/uploadCloudinary.js';
+import { logAudit } from '../services/auditLogger.js';
 
 const router = Router();
 
@@ -142,31 +143,122 @@ router.get('/notes', authenticate, authorize('admin'), async (req, res, next) =>
   } catch (err) { next(err); }
 });
 
-router.post('/notes', authenticate, authorize('admin'), upload.single('file'), validate(createNoteSchema), async (req, res, next) => {
+router.post('/notes', authenticate, authorize('admin'), upload.fields([
+  { name: 'files', maxCount: 10 },
+  { name: 'thumbnail', maxCount: 1 },
+]), validate(createNoteSchema), async (req, res, next) => {
   try {
-    if (!req.file) return res.status(400).json({ success: false, message: 'File is required' });
-    if (!validatePdfBuffer(req.file.buffer)) {
-      return res.status(400).json({ success: false, message: 'File content does not match PDF format' });
+    const uploaded = req.files?.files || [];
+    if (!uploaded.length) return res.status(400).json({ success: false, message: 'At least one file is required' });
+
+    for (const f of uploaded) {
+      if (f.mimetype === 'application/pdf' && !validatePdfBuffer(f.buffer)) {
+        return res.status(400).json({ success: false, message: `File "${f.originalname}" is not a valid PDF` });
+      }
     }
 
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder: 'noteunix/notes', resource_type: 'auto' },
-        (err, result) => (err ? reject(err) : resolve(result))
-      );
-      stream.end(req.file.buffer);
-    });
+    let files;
+    let thumbnailUrl = '';
+    try {
+      files = await uploadFiles(uploaded);
+      const thumbFile = req.files?.thumbnail?.[0];
+      if (thumbFile) {
+        thumbnailUrl = await uploadThumbnail(thumbFile.buffer);
+      }
+    } catch (uploadErr) {
+      if (files?.length) {
+        await Promise.all(files.map(f => {
+          const pid = extractPublicId(f.url);
+          return pid ? deleteFile(pid).catch(() => {}) : Promise.resolve();
+        }));
+      }
+      throw uploadErr;
+    }
 
-    const note = await Note.create({
-      subjectId: req.validatedBody.subjectId,
-      userId: req.user._id,
-      title: req.validatedBody.title,
-      description: req.validatedBody.description,
-      cloudinaryUrl: result.secure_url,
-      fileType: 'pdf', fileSize: req.file.size,
-      approved: true,
-    });
+    let note;
+    try {
+      note = await Note.create({
+        subjectId: req.validatedBody.subjectId,
+        userId: req.user._id,
+        title: req.validatedBody.title,
+        description: req.validatedBody.description,
+        resourceType: req.validatedBody.resourceType,
+        files,
+        thumbnailUrl,
+        approved: true,
+      });
+    } catch (dbErr) {
+      await Promise.all(files.map(f => {
+        const pid = extractPublicId(f.url);
+        return pid ? deleteFile(pid).catch(() => {}) : Promise.resolve();
+      }));
+      if (thumbnailUrl) {
+        const pid = extractPublicId(thumbnailUrl);
+        if (pid) await deleteFile(pid).catch(() => {});
+      }
+      throw dbErr;
+    }
+
     res.status(201).json({ success: true, data: note });
+  } catch (err) { next(err); }
+});
+
+router.patch('/notes/:id', authenticate, authorize('admin'), (req, res, next) => {
+  if (req.is('multipart/form-data')) {
+    upload.fields([
+      { name: 'files', maxCount: 10 },
+      { name: 'thumbnail', maxCount: 1 },
+    ])(req, res, (err) => {
+      if (err) return next(err);
+      next();
+    });
+  } else {
+    next();
+  }
+}, validate(updateNoteSchema), async (req, res, next) => {
+  try {
+    const note = await Note.findById(req.params.id);
+    if (!note) return res.status(404).json({ success: false, message: 'Not found' });
+    const updates = { ...req.validatedBody };
+
+    const uploaded = req.files?.files || [];
+    if (uploaded.length) {
+      for (const f of uploaded) {
+        if (f.mimetype === 'application/pdf' && !validatePdfBuffer(f.buffer)) {
+          return res.status(400).json({ success: false, message: `File "${f.originalname}" is not a valid PDF` });
+        }
+      }
+      const oldFiles = note.files?.length ? [...note.files] : [];
+      const oldThumb = note.thumbnailUrl || '';
+      updates.files = await uploadFiles(uploaded);
+      await Promise.all(oldFiles.map(f => {
+        const pid = extractPublicId(f.url);
+        return pid ? deleteFile(pid).catch(() => {}) : Promise.resolve();
+      }));
+      if (oldThumb) {
+        const pid = extractPublicId(oldThumb);
+        if (pid) await deleteFile(pid).catch(() => {});
+      }
+    }
+
+    const thumbFile = req.files?.thumbnail?.[0];
+    if (thumbFile) {
+      const oldThumb = note.thumbnailUrl || '';
+      updates.thumbnailUrl = await uploadThumbnail(thumbFile.buffer);
+      if (oldThumb) {
+        const pid = extractPublicId(oldThumb);
+        if (pid) await deleteFile(pid).catch(() => {});
+      }
+    }
+
+    Object.assign(note, updates);
+    await note.save();
+    await logAudit({
+      adminId: req.user._id, adminEmail: req.user.email,
+      action: 'note_edit', targetType: 'note', targetId: note._id,
+      targetTitle: note.title,
+    });
+    res.json({ success: true, data: note });
   } catch (err) { next(err); }
 });
 
@@ -182,8 +274,7 @@ router.patch('/notes/:id/approve', authenticate, authorize('admin'), async (req,
       message: `"${note.title}" has been approved.`,
       link: noteUrl,
     });
-    sendNoteApprovedEmail(note.userId.email, note.title, noteUrl);
-    await AuditLog.create({
+    await logAudit({
       adminId: req.user._id, adminEmail: req.user.email,
       action: 'note_approve', targetType: 'note', targetId: note._id,
       targetTitle: note.title,
@@ -204,7 +295,7 @@ router.patch('/notes/:id/reject', authenticate, authorize('admin'), async (req, 
       message: `"${note.title}" was not approved. Please review and resubmit.`,
       link: noteUrl,
     });
-    await AuditLog.create({
+    await logAudit({
       adminId: req.user._id, adminEmail: req.user.email,
       action: 'note_reject', targetType: 'note', targetId: note._id,
       targetTitle: note.title,
@@ -223,19 +314,9 @@ router.delete('/notes/:id', authenticate, authorize('admin'), async (req, res, n
       Bookmark.deleteMany({ noteId: note._id }),
       Rating.deleteMany({ noteId: note._id }),
     ]);
-    if (note.cloudinaryUrl) {
-      try {
-        const parts = note.cloudinaryUrl.split('/upload/');
-        if (parts[1]) {
-          const publicId = parts[1].replace(/\.[^.]+$/, '');
-          await cloudinary.uploader.destroy(publicId);
-        }
-      } catch (cloudErr) {
-        console.warn('Cloudinary delete failed for note', note._id, cloudErr.message);
-      }
-    }
+    await deleteNoteFiles(note);
     await Note.findByIdAndDelete(note._id);
-    await AuditLog.create({
+    await logAudit({
       adminId: req.user._id, adminEmail: req.user.email,
       action: 'note_delete', targetType: 'note', targetId: note._id,
       targetTitle: note.title || 'Untitled',
@@ -252,7 +333,7 @@ router.patch('/users/:id/ban', authenticate, authorize('admin'), async (req, res
     user.banned = !user.banned;
     if (user.banned) user.suspendedUntil = null;
     await user.save();
-    await AuditLog.create({
+    await logAudit({
       adminId: req.user._id, adminEmail: req.user.email,
       action: user.banned ? 'user_ban' : 'user_unban',
       targetType: 'user', targetId: user._id,
@@ -274,7 +355,7 @@ router.patch('/users/:id/suspend', authenticate, authorize('admin'), async (req,
     user.banned = true;
     user.suspendedUntil = new Date(Date.now() + durationHours * 60 * 60 * 1000);
     await user.save();
-    await AuditLog.create({
+    await logAudit({
       adminId: req.user._id, adminEmail: req.user.email,
       action: 'user_suspend', targetType: 'user', targetId: user._id,
       targetTitle: user.fullname || user.email,
@@ -284,11 +365,44 @@ router.patch('/users/:id/suspend', authenticate, authorize('admin'), async (req,
   } catch (err) { next(err); }
 });
 
+router.patch('/users/:id/verify', authenticate, authorize('admin'), async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'Not found' });
+    user.isVerified = !user.isVerified;
+    await user.save();
+    await logAudit({
+      adminId: req.user._id, adminEmail: req.user.email,
+      action: user.isVerified ? 'user_verify' : 'user_unverify',
+      targetType: 'user', targetId: user._id,
+      targetTitle: user.fullname || user.email,
+    });
+    res.json({ success: true, data: user.toPublicJSON() });
+  } catch (err) { next(err); }
+});
+
 router.delete('/users/:id', authenticate, authorize('admin'), async (req, res, next) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ success: false, message: 'Not found' });
-    await AuditLog.create({
+    // Clean up all user data: notes (and their Cloudinary files), comments, bookmarks, ratings, reports, notifications
+    const userNotes = await Note.find({ userId: user._id }).select('files thumbnailUrl');
+    await Promise.all([
+      ...userNotes.map(note => deleteNoteFiles(note)),
+      Note.deleteMany({ userId: user._id }),
+      Comment.deleteMany({ userId: user._id }),
+      Bookmark.deleteMany({ userId: user._id }),
+      Rating.deleteMany({ userId: user._id }),
+      Report.deleteMany({ reportedBy: user._id }),
+      Notification.deleteMany({ userId: user._id }),
+    ]);
+    // Clean up avatar
+    if (user.avatar) {
+      const avatarId = extractPublicId(user.avatar);
+      if (avatarId) await deleteFile(avatarId).catch(() => {});
+    }
+    await User.findByIdAndDelete(user._id);
+    await logAudit({
       adminId: req.user._id, adminEmail: req.user.email,
       action: 'user_delete', targetType: 'user', targetId: user._id,
       targetTitle: user.fullname || user.email,
@@ -342,7 +456,7 @@ router.delete('/comments/:id', authenticate, authorize('admin'), async (req, res
     if (!comment) return res.status(404).json({ success: false, message: 'Not found' });
     await Comment.deleteMany({ parentComment: comment._id });
     await Comment.findByIdAndDelete(comment._id);
-    await AuditLog.create({
+    await logAudit({
       adminId: req.user._id, adminEmail: req.user.email,
       action: 'comment_delete', targetType: 'comment', targetId: comment._id,
       targetTitle: `Comment on "${comment.noteId?.title || 'note'}"`,
@@ -390,22 +504,24 @@ router.post('/send-email', authenticate, authorize('admin'), async (req, res, ne
     }
 
     const results = { sent: 0, failed: 0, errors: [] };
+    let retryHours = null;
     for (const r of recipients) {
-      try {
-        await sendCustomEmail({
-          to: r.email,
-          subject,
-          html: html.replace(/\{\{name\}\}/g, r.name),
-        });
+      const result = await sendCustomEmail({
+        to: r.email,
+        subject,
+        html: html.replace(/\{\{name\}\}/g, r.name),
+      });
+      if (result.success) {
         results.sent++;
-      } catch (err) {
+      } else {
         results.failed++;
-        results.errors.push({ email: r.email, error: err.message });
+        results.errors.push({ email: r.email, error: result.reason || 'Unknown error' });
+        if (result.retryHours) retryHours = result.retryHours;
       }
     }
 
     try {
-      await AuditLog.create({
+      await logAudit({
         adminId: req.user._id, adminEmail: req.user.email,
         action: 'send_email', targetType: 'email',
         targetTitle: subject,
@@ -413,7 +529,9 @@ router.post('/send-email', authenticate, authorize('admin'), async (req, res, ne
       });
     } catch { /* non-critical */ }
 
-    res.json({ success: true, data: results });
+    const response = { success: true, data: results };
+    if (retryHours) response.retryHours = retryHours;
+    res.json(response);
   } catch (err) { next(err); }
 });
 
@@ -427,10 +545,14 @@ router.post('/contact/:id/reply', authenticate, authorize('admin'), async (req, 
     if (!msg) return res.status(404).json({ success: false, message: 'Message not found' });
 
     if (isEmailEnabled()) {
-      try {
-        await sendContactReplyEmail(msg.email, msg.name, msg.topic || 'Your inquiry', replyContent.trim());
-      } catch (err) {
-        return res.status(500).json({ success: false, message: 'Failed to send reply email. Please try again.' });
+      const emailResult = await sendCustomEmail({
+        to: msg.email,
+        subject: `Re: ${msg.topic || 'Your inquiry'}`,
+        html: `<p>Hi ${msg.name},</p><p>${replyContent.trim().replace(/\n/g, '<br>')}</p>`,
+      });
+      if (!emailResult.success) {
+        const retry = getEmailRetryInfo();
+        return res.status(503).json({ success: false, message: `Email service is temporarily unavailable. Please try again in ${retry.hours} hour${retry.hours > 1 ? 's' : ''}.`, retryHours: retry.hours });
       }
     }
 
@@ -441,7 +563,7 @@ router.post('/contact/:id/reply', authenticate, authorize('admin'), async (req, 
     await msg.save();
 
     try {
-      await AuditLog.create({
+      await logAudit({
         adminId: req.user._id, adminEmail: req.user.email,
         action: 'send_email', targetType: 'email',
         targetTitle: `Reply to ${msg.email}`,

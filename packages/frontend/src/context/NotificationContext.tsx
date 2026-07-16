@@ -38,7 +38,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => { refreshCount(); }, [refreshCount]);
 
   useEffect(() => {
-    const isNotificationsPage = pathname === '/notifications' || pathname.startsWith('/user/notifications');
+    const isNotificationsPage = pathname === '/notifications' || pathname.startsWith('/user/notifications') || pathname.startsWith('/admin/notifications');
     if (isNotificationsPage) {
       setUnreadCount(0);
       notificationApi.markAllRead().then(() => refreshCount()).catch(() => {});

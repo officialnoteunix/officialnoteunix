@@ -18,6 +18,7 @@ export interface User {
   email: string;
   role: 'student' | 'admin';
   avatar: string | null;
+  isVerified?: boolean;
   banned: boolean;
   suspendedUntil: string | null;
   createdAt: string;
@@ -30,15 +31,28 @@ export interface Subject {
   semesterId?: { _id: string; title: string } & Record<string, any>;
 }
 
+export interface NoteFile {
+  url: string;
+  fileType: string;
+  fileSize: number;
+}
+
 export interface Note {
   _id: string;
   title: string;
   description?: string;
-  fileUrl: string;
+  resourceType: string;
+  files?: NoteFile[];
+  cloudinaryUrl?: string;
+  fileType?: string;
+  fileSize?: number;
   approved: boolean;
   downloads: number;
-  userId?: Pick<User, '_id' | 'fullname'>;
-  subjectId?: Pick<Subject, '_id' | 'name'>;
+  averageRating: number;
+  ratingsCount: number;
+  userId?: Pick<User, '_id' | 'fullname' | 'avatar'> & { isVerified?: boolean };
+  subjectId?: Pick<Subject, '_id' | 'name'> & { semesterId?: any };
+  thumbnailUrl?: string;
   createdAt: string;
 }
 

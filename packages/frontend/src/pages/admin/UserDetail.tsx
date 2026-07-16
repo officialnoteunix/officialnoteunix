@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { emitStatsRefresh } from '../../utils/statsRefresh';
 import { useAuth } from '../../context/AuthContext';
 import type { UserDetail as UserDetailType, Note } from '../../types';
-import { ArrowLeft, Users, FileText, Bookmark, Download, Mail, Calendar, Shield, Ban, CheckCircle, Timer, ShieldOff } from 'lucide-react';
+import { ArrowLeft, Users, FileText, Bookmark, Download, Mail, Calendar, Shield, Ban, CheckCircle, Timer, ShieldOff, BadgeCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import RestrictModal from '../../components/ui/RestrictModal';
@@ -116,6 +116,18 @@ export default function UserDetail() {
     }
   }, [restrictTarget, showToast, loadUser]);
 
+  const handleToggleVerify = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await adminApi.toggleVerify(user._id);
+      setUser(prev => prev ? { ...prev, isVerified: res.data.data.isVerified } : prev);
+      showToast('success', `Verification ${res.data.data.isVerified ? 'granted' : 'removed'} for ${user.fullname}`);
+      emitStatsRefresh();
+    } catch (err) {
+      showToast('error', getApiError(err, 'Failed to toggle verification'));
+    }
+  }, [user, showToast]);
+
   const notesChart = useMemo(() => user?.notesByMonth ? fillMonths(user.notesByMonth) : [], [user]);
 
   if (loading) return <div className="loading-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>;
@@ -139,6 +151,11 @@ export default function UserDetail() {
               <span className="user-detail-email"><Mail size={13} /> <span className="user-detail-truncate">{user.email}</span></span>
               <span className="user-detail-actions-row">
                 <Shield size={13} /> {user.role}
+                {user.isVerified && (
+                  <span className="badge badge-primary" style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <BadgeCheck size={11} /> Verified
+                  </span>
+                )}
                 {suspended ? (
                   <span className="badge badge-warning" style={{ fontSize: 10 }} title={remaining ? `Remaining: ${remaining}` : ''}>
                     <Timer size={11} style={{ marginRight: 3 }} /> {remaining}
@@ -158,6 +175,18 @@ export default function UserDetail() {
                 ) : (
                   <button onClick={() => setRestrictTarget(user)} className="btn-rounded" style={{ padding: '5px 12px', fontSize: 11, backgroundColor: 'var(--danger)', color: '#fff', display: 'flex', gap: 4, alignItems: 'center' }}>
                     <ShieldOff size={12} /> Restrict
+                  </button>
+                )}
+                {user.role !== 'admin' && (
+                  <button onClick={handleToggleVerify} className="btn-rounded" style={{
+                    padding: '5px 12px', fontSize: 11,
+                    backgroundColor: user.isVerified ? 'var(--bg-subtle)' : 'var(--primary)',
+                    color: user.isVerified ? 'var(--text-muted)' : '#fff',
+                    display: 'flex', gap: 4, alignItems: 'center',
+                    border: user.isVerified ? '1px solid var(--border-color)' : 'none',
+                  }}>
+                    <BadgeCheck size={12} />
+                    {user.isVerified ? 'Unverify' : 'Verify'}
                   </button>
                 )}
               </span>

@@ -98,7 +98,12 @@ export default function AdminReports() {
               <tbody>
                 {reports.map(r => (
                   <tr key={r._id} onClick={() => window.innerWidth <= 640 && setDetailTarget(r)}>
-                    <td data-card-title style={{ fontWeight: 600, fontSize: 13 }}><Link to={`/notes/${r.note?._id}`} style={{ color: 'inherit', textDecoration: 'none' }}>{r.note?.title || 'Unknown'}</Link></td>
+                    <td data-card-title style={{ fontWeight: 600, fontSize: 13 }}>
+                      <Link to={`/notes/${r.note?._id}`} style={{ color: 'inherit', textDecoration: 'none' }}
+                        onClick={e => { if (window.innerWidth <= 640) { e.preventDefault(); e.stopPropagation(); setDetailTarget(r); } }}>
+                        {r.note?.title || 'Unknown'}
+                      </Link>
+                    </td>
                     <td style={{ color: 'var(--text-muted)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div className="user-avatar" style={{ width: 24, height: 24, fontSize: 9, background: r.reportedBy?.avatar ? `url(${r.reportedBy.avatar}) center/cover` : undefined, color: r.reportedBy?.avatar ? 'transparent' : undefined }}>{r.reportedBy?.avatar ? '' : (r.reportedBy?.fullname?.charAt(0) || '?')}</div>
                       {r.reportedBy?.fullname || 'Unknown'}

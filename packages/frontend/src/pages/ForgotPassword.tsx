@@ -2,23 +2,31 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authApi } from '../api/auth';
 import { getApiError } from '../utils/constants';
-import { Mail, ArrowLeft, Loader2 } from 'lucide-react';
+import { Mail, ArrowLeft, Loader2, Clock } from 'lucide-react';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [retryHours, setRetryHours] = useState<number | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setRetryHours(null);
     setLoading(true);
     try {
       await authApi.forgotPassword(email);
       setSent(true);
     } catch (err) {
-      setError(getApiError(err, 'Something went wrong. Try again later.'));
+      const errData = err.response?.data;
+      if (err.response?.status === 503 && errData?.retryHours) {
+        setRetryHours(errData.retryHours);
+        setError(errData.message || 'Email service is temporarily unavailable.');
+      } else {
+        setError(getApiError(err, 'Something went wrong. Try again later.'));
+      }
     } finally {
       setLoading(false);
     }
@@ -54,9 +62,15 @@ export default function ForgotPassword() {
           Enter your email and we'll send you a reset link.
         </p>
         {error && (
-          <div style={{ padding: '10px 14px', background: 'var(--danger-light)', color: 'var(--danger)', borderRadius: 'var(--radius-sm)', fontSize: 13, marginBottom: 16 }}>
-            {error}
+          <div style={{ padding: '10px 14px', background: retryHours ? 'var(--warning-light)' : 'var(--danger-light)', color: retryHours ? 'var(--warning)' : 'var(--danger)', borderRadius: 'var(--radius-sm)', fontSize: 13, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {retryHours && <Clock size={14} style={{ flexShrink: 0 }} />}
+            <span>{error}</span>
           </div>
+        )}
+        {retryHours && (
+          <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: -8, marginBottom: 16, paddingLeft: 4 }}>
+            Please try again in about {retryHours} hour{retryHours > 1 ? 's' : ''}.
+          </p>
         )}
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 20 }}>

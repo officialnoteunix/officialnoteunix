@@ -1,0 +1,221 @@
+.settings-tabs-bar {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background-color: var(--bg-subtle);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  margin-bottom: 24px;
+}
+
+.settings-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.settings-tab:hover {
+  color: var(--text-main);
+  background-color: rgba(128, 128, 128, 0.06);
+}
+
+.settings-tab.active {
+  background-color: var(--bg-surface);
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.dark-mode .settings-tab.active {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.settings-tab-content {
+  animation: fadeIn 0.2s ease;
+}
+
+.settings-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.settings-input-wrap {
+  position: relative;
+}
+
+.settings-input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-light);
+  pointer-events: none;
+}
+
+.settings-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 13px;
+}
+
+.settings-info-label {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-info-value {
+  font-weight: 600;
+}
+
+.profile-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-subtle);
+  font-size: 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.profile-info-label {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.profile-info-value {
+  font-weight: 600;
+}
+
+.upload-h-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.upload-h-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-h-field label,
+.upload-h-dropzone label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+
+.upload-h-fields-col {
+  flex: 1.4;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.upload-h-dropzone {
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-dropzone {
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 28px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+  min-height: 168px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-dropzone:hover {
+  border-color: var(--primary-light);
+  background-color: rgba(99, 102, 241, 0.03);
+}
+
+.dark-mode .upload-dropzone:hover {
+  background-color: rgba(129, 140, 248, 0.04);
+}
+
+.upload-dropzone.drag-over {
+  border-color: var(--primary);
+  background-color: var(--primary-light);
+}
+
+.upload-dropzone.has-file {
+  border-color: var(--secondary);
+  background-color: var(--secondary-light);
+}
+
+.upload-dropzone-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 768px) {
+  .upload-h-row {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-tabs-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .settings-tabs-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .settings-tab {
+    flex: 0 0 auto;
+    padding: 10px 16px;
+    font-size: 12px;
+    gap: 6px;
+  }
+  .settings-tab span {
+    display: none;
+  }
+  .settings-tab svg {
+    margin: 0;
+  }
+  .settings-tab-content .content-card {
+    padding: 20px !important;
+  }
+}

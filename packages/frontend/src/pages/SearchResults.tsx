@@ -1,11 +1,27 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { searchApi } from '../api/search';
-import { Search, FileText, BookOpen, BookText, X, GraduationCap, ExternalLink } from 'lucide-react';
+import { Search, FileText, BookOpen, BookText, X, Filter, Upload, University, Notebook } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { getApiError } from '../utils/constants';
 import Pagination from '../components/ui/Pagination';
 import AdSlot from '../components/ad/AdSlot';
+import Select from '../components/ui/Select';
+
+const RESOURCE_TYPES = [
+  { value: '', label: 'All Types' },
+  { value: 'study_notes', label: 'Study Notes' },
+  { value: 'past_question', label: 'Past Question' },
+  { value: 'assignment', label: 'Assignment' },
+  { value: 'lab_report', label: 'Lab Report' },
+  { value: 'practical_file', label: 'Practical File' },
+  { value: 'reference_book', label: 'Reference Book' },
+  { value: 'syllabus', label: 'Syllabus' },
+  { value: 'study_guide', label: 'Study Guide' },
+  { value: 'important_question', label: 'Important Question' },
+  { value: 'mcq', label: 'MCQ' },
+  { value: 'department_resource', label: 'Department Resource' },
+];
 
 const cardPalette = [
   { bg: 'var(--palette-0-bg)', color: 'var(--palette-0)' },
@@ -31,10 +47,16 @@ export default function SearchResults() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState(q);
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [notePage, setNotePage] = useState(1);
+  const [resourceType, setResourceType] = useState('');
+
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   useEffect(() => {
     setInput(q);
@@ -52,14 +74,74 @@ export default function SearchResults() {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [input, navigate]);
 
+  const acRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    if (acRef.current) clearTimeout(acRef.current);
+    const trimmed = input.trim();
+    if (trimmed.length < 2) { setSuggestions([]); setSuggestionsOpen(false); return; }
+    acRef.current = setTimeout(() => {
+      searchApi.autocomplete(trimmed)
+        .then(res => {
+          setSuggestions(res.data.data);
+          setSuggestionsOpen(res.data.data.length > 0);
+        })
+        .catch(() => {});
+    }, 100);
+    return () => { if (acRef.current) clearTimeout(acRef.current); };
+  }, [input]);
+
+  useEffect(() => {
+    if (!suggestionsOpen) setActiveIndex(-1);
+  }, [suggestionsOpen]);
+
+  const closeSuggestions = useCallback(() => setSuggestionsOpen(false), []);
+
+  useEffect(() => {
+    if (!suggestionsOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+          inputRef.current && !inputRef.current.closest('div')?.contains(e.target as Node)) {
+        closeSuggestions();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [suggestionsOpen, closeSuggestions]);
+
+  const navigateToSuggestion = useCallback((s: any) => {
+    setSuggestionsOpen(false);
+    switch (s.type) {
+      case 'university': navigate(`/courses?university=${s._id}`); break;
+      case 'course': navigate(`/courses/${s._id}`); break;
+      case 'subject': navigate(`/subjects/${s._id}`); break;
+      case 'note': navigate(`/notes/${s._id}`); break;
+    }
+  }, [navigate]);
+
+  const handleInputKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!suggestionsOpen) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(i => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      navigateToSuggestion(suggestions[activeIndex]);
+    } else if (e.key === 'Escape') {
+      setSuggestionsOpen(false);
+    }
+  }, [suggestionsOpen, activeIndex, suggestions, navigateToSuggestion]);
+
   useEffect(() => {
     if (!q || q.length < 2) { setResults(null); return; }
     setLoading(true);
-    searchApi.search(q, notePage)
+    searchApi.search(q, notePage, resourceType || undefined)
       .then(res => setResults(res.data.data))
       .catch(err => showToast('error', getApiError(err, 'Search failed')))
       .finally(() => setLoading(false));
-  }, [q, notePage, showToast]);
+  }, [q, notePage, showToast, resourceType]);
 
   useEffect(() => {
     setNotePage(1);
@@ -76,7 +158,9 @@ export default function SearchResults() {
           </div>
         )}
         <div style={{ padding: thumb ? '12px 16px 16px' : '16px' }}>
-          <span className="hierarchy-card-badge" style={{ background: c.bg, color: c.color, marginBottom: 6 }}>Note</span>
+          <span className="hierarchy-card-badge" style={{ color: c.color, marginBottom: 6, textTransform: 'capitalize' }}>
+            {(note.resourceType || 'study_notes').replace(/_/g, ' ')}
+          </span>
           <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4, color: 'var(--text-main)', lineHeight: 1.3 }}>{note.title}</h4>
           <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {note.description || 'No description'}
@@ -109,7 +193,9 @@ export default function SearchResults() {
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
+          onKeyDown={handleInputKeyDown}
           placeholder="Search courses, subjects, notes..."
+          autoComplete="off"
           style={{
             flex: 1, padding: '14px 0', border: 'none', outline: 'none',
             background: 'transparent', color: 'var(--text-main)', fontSize: 15,
@@ -126,6 +212,31 @@ export default function SearchResults() {
           </button>
         )}
       </div>
+
+      {suggestionsOpen && (
+        <div ref={dropdownRef} className="dropdown-panel dropdown-panel--full autocomplete-panel">
+          <div className="dropdown-items">
+            {suggestions.map((s, i) => (
+              <button
+                key={`${s.type}-${s._id}`}
+                type="button"
+                onMouseDown={e => { e.preventDefault(); navigateToSuggestion(s); }}
+                onMouseEnter={() => setActiveIndex(i)}
+                className={`dropdown-item ${activeIndex === i ? 'active' : ''}`}
+              >
+                {s.type === 'university' && <University size={16} className="dropdown-item-icon" data-type="university" />}
+                {s.type === 'course' && <BookOpen size={16} className="dropdown-item-icon" data-type="course" />}
+                {s.type === 'subject' && <Notebook size={16} className="dropdown-item-icon" data-type="subject" />}
+                {s.type === 'note' && <FileText size={16} className="dropdown-item-icon" data-type="note" />}
+                <div className="dropdown-item-body">
+                  <div className="dropdown-item-label" style={{ fontWeight: activeIndex === i ? 600 : 400 }}>{s.label}</div>
+                </div>
+                <span className="dropdown-item-meta">{s.type}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!q ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -148,6 +259,17 @@ export default function SearchResults() {
           <h2 style={{ fontSize: 20, fontWeight: 700 }}>
             Results for "<span style={{ color: 'var(--primary)' }}>{q}</span>"
           </h2>
+
+          {results.notesTotal > 0 && (
+            <div style={{ maxWidth: 280 }}>
+              <Select
+                value={resourceType}
+                onChange={(val) => { setResourceType(val); setNotePage(1); }}
+                options={RESOURCE_TYPES}
+                icon={<Filter size={16} />}
+              />
+            </div>
+          )}
 
           {results.courses?.length > 0 && (
             <section>
@@ -206,8 +328,18 @@ export default function SearchResults() {
           {(!results.courses?.length && !results.subjects?.length && !results.notes?.length) && (
             <div className="empty-state">
               <Search size={48} />
-              <h3>No results found</h3>
-              <p>Try a different search term.</p>
+              <h3>No results found for "{q}"</h3>
+              <p style={{ maxWidth: 400, margin: '0 auto 20px' }}>
+                This resource doesn't exist yet. You can help by uploading it!
+              </p>
+              <Link to="/user/upload" className="btn-rounded btn-primary"
+                style={{ padding: '10px 24px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+                <Upload size={16} /> Upload this resource
+              </Link>
+              <div style={{ marginTop: 20, fontSize: 12, color: 'var(--text-light)' }}>
+                Try searching with different keywords or browse by{' '}
+                <Link to="/notes" style={{ color: 'var(--primary)' }}>university</Link>
+              </div>
             </div>
           )}
         </div>

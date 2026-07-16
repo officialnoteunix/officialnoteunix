@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { universityApi } from '../api/university';
-import { Building, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Building, ChevronRight } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { getApiError } from '../utils/constants';
 
@@ -39,8 +39,14 @@ export default function UniversityDetail() {
   if (!university) return <div className="empty-state"><h3>Not found</h3></div>;
 
   return (
-    <div style={{ padding: '100px 5% 60px', maxWidth: 1200, margin: '0 auto' }}>
-      <Link to="/notes"
+    <div className="detail-page" style={{ padding: '100px 5% 60px', maxWidth: 1200, margin: '0 auto' }}>
+      <div className="mobile-breadcrumb">
+        <Link to="/notes" className="mobile-breadcrumb-back"><ArrowLeft size={14} /></Link>
+        <span className="mobile-breadcrumb-text">Browse</span>
+        <span className="mobile-breadcrumb-sep">/</span>
+        <span className="mobile-breadcrumb-current">{university.name}</span>
+      </div>
+      <Link to="/notes" className="hide-mobile-breadcrumb"
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 14, marginBottom: 16, textDecoration: 'none' }}>
         <Building size={16} /> Browse
       </Link>

@@ -31,7 +31,7 @@ async function startupCheck() {
   let allPassed = true;
 
   // ── 1. Environment Variables ────────────────────────────
-  console.log('[1/7] Environment Variables');
+  console.log('[1/6] Environment Variables');
   const required = {
     MONGO_URI: 'Database connection',
     JWT_ACCESS_SECRET: 'Access token signing',
@@ -55,34 +55,15 @@ async function startupCheck() {
   }
 
   // ── 2. JWT Secrets Strength ─────────────────────────────
-  console.log('\n[2/7] JWT Secrets');
+  console.log('\n[2/6] JWT Secrets');
   const accessLen = (process.env.JWT_ACCESS_SECRET || '').length;
   const refreshLen = (process.env.JWT_REFRESH_SECRET || '').length;
   allPassed = check('Access secret length ≥ 32 chars', accessLen >= 32, `${accessLen} chars`) && allPassed;
   allPassed = check('Refresh secret length ≥ 32 chars', refreshLen >= 32, `${refreshLen} chars`) && allPassed;
   allPassed = check('Secrets are different', process.env.JWT_ACCESS_SECRET !== process.env.JWT_REFRESH_SECRET) && allPassed;
 
-  // ── 3. MongoDB ──────────────────────────────────────────
-  console.log('\n[3/7] MongoDB');
-  try {
-    const mongoose = (await import('mongoose')).default;
-    await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 5000 });
-    const ping = await mongoose.connection.db.admin().ping();
-    allPassed = check('Connection', ping.ok === 1, mongoose.connection.host) && allPassed;
-
-    const User = (await import('./models/User.js')).default;
-    const adminCount = await User.countDocuments({ role: 'admin' });
-    const totalUsers = await User.countDocuments();
-    check('Admin users', adminCount > 0, `${adminCount} found`);
-    check('Total users', true, `${totalUsers} total`);
-
-    await mongoose.disconnect();
-  } catch (err) {
-    allPassed = check('Connection', false, err.message) && allPassed;
-  }
-
-  // ── 4. Cloudinary ───────────────────────────────────────
-  console.log('\n[4/7] Cloudinary');
+  // ── 3. Cloudinary ───────────────────────────────────────
+  console.log('\n[3/6] Cloudinary');
   try {
     const { v2: cld } = await import('cloudinary');
     cld.config({
@@ -96,8 +77,8 @@ async function startupCheck() {
     allPassed = check('API connection', false, err.message) && allPassed;
   }
 
-  // ── 5. SMTP / Email ─────────────────────────────────────
-  console.log('\n[5/7] SMTP / Email');
+  // ── 4. SMTP / Email ─────────────────────────────────────
+  console.log('\n[4/6] SMTP / Email');
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
     check('Configuration', false, 'SMTP not configured — emails disabled');
   } else {
@@ -118,16 +99,16 @@ async function startupCheck() {
     }
   }
 
-  // ── 6. Google OAuth ─────────────────────────────────────
-  console.log('\n[6/7] Google OAuth');
+  // ── 5. Google OAuth ─────────────────────────────────────
+  console.log('\n[5/6] Google OAuth');
   const googleConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
   check('Credentials', googleConfigured, googleConfigured ? 'configured' : 'not configured — Google sign-in disabled');
   if (googleConfigured) {
     check('Callback URL', true, `${process.env.CORS_ORIGIN || 'http://localhost:5173'}/api/auth/google/callback`);
   }
 
-  // ── 7. Port Availability ────────────────────────────────
-  console.log('\n[7/7] Port');
+  // ── 6. Port Availability ────────────────────────────────
+  console.log('\n[6/6] Port');
   try {
     const net = await import('net');
     const available = await new Promise((resolve) => {
@@ -161,7 +142,7 @@ import { startCleanupScheduler } from './jobs/cleanup.js';
 configurePassport();
 
 async function start() {
-  const healthy = await startupCheck();
+  await startupCheck();
 
   try {
     await mongoose.connect(process.env.MONGO_URI);
@@ -172,6 +153,12 @@ async function start() {
       api_key: process.env.CLOUDINARY_API_KEY,
       api_secret: process.env.CLOUDINARY_API_SECRET,
     });
+
+    // Clean up expired suspensions on startup
+    await mongoose.connection.db.collection('users').updateMany(
+      { suspendedUntil: { $ne: null, $lt: new Date() } },
+      { $set: { banned: false, suspendedUntil: null } }
+    );
 
     const server = app.listen(PORT, () => {
       console.log(`[Server] Running on port ${PORT}`);

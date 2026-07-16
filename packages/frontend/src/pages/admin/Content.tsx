@@ -254,7 +254,7 @@ export default function Content() {
                 className="hierarchy-card"
                 style={{ borderLeftColor: c.color, cursor: isLeaf ? 'default' : 'pointer' } as React.CSSProperties}
               >
-                <span className="hierarchy-card-badge" style={{ background: c.bg, color: c.color }}>
+                <span className="hierarchy-card-badge" style={{ color: c.color }}>
                   {currentLevel.singular}
                 </span>
                 <div className="hierarchy-card-title">{item.name || item.title}</div>

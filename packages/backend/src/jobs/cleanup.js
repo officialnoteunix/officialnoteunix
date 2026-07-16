@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Note from '../models/Note.js';
 import Comment from '../models/Comment.js';
@@ -9,6 +8,7 @@ import Notification from '../models/Notification.js';
 import AuditLog from '../models/AuditLog.js';
 import ContactMessage from '../models/ContactMessage.js';
 import Ad from '../models/Ad.js';
+import { deleteNoteFiles } from '../utils/uploadCloudinary.js';
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -62,26 +62,26 @@ async function cleanupOrphanedComments() {
   return result.deletedCount;
 }
 
-async function cleanupOrphanedBookmarks() {
-  const existingNoteIds = await Note.distinct('_id');
+async function cleanupOrphanedBookmarks(existingNoteIds) {
+  const noteIds = existingNoteIds || await Note.distinct('_id');
   const result = await Bookmark.deleteMany({
-    noteId: { $nin: existingNoteIds },
+    noteId: { $nin: noteIds },
   });
   return result.deletedCount;
 }
 
-async function cleanupOrphanedRatings() {
-  const existingNoteIds = await Note.distinct('_id');
+async function cleanupOrphanedRatings(existingNoteIds) {
+  const noteIds = existingNoteIds || await Note.distinct('_id');
   const result = await Rating.deleteMany({
-    noteId: { $nin: existingNoteIds },
+    noteId: { $nin: noteIds },
   });
   return result.deletedCount;
 }
 
-async function cleanupOrphanedReports() {
-  const existingNoteIds = await Note.distinct('_id');
+async function cleanupOrphanedReports(existingNoteIds) {
+  const noteIds = existingNoteIds || await Note.distinct('_id');
   const result = await Report.deleteMany({
-    note: { $nin: existingNoteIds },
+    note: { $nin: noteIds },
   });
   return result.deletedCount;
 }
@@ -127,6 +127,23 @@ async function cleanupOldNotifications() {
   return result.deletedCount;
 }
 
+async function cleanupStaleUnapprovedNotes() {
+  const cutoff = new Date(Date.now() - 90 * DAY);
+  const staleNotes = await Note.find({ approved: false, createdAt: { $lt: cutoff } }).select('files thumbnailUrl');
+  if (!staleNotes.length) return 0;
+  await Promise.all(staleNotes.map(n => deleteNoteFiles(n)));
+  return Note.deleteMany({ _id: { $in: staleNotes.map(n => n._id) } }).then(r => r.deletedCount);
+}
+
+async function cleanupOldResolvedReports() {
+  const cutoff = new Date(Date.now() - 180 * DAY);
+  const result = await Report.deleteMany({
+    status: { $in: ['resolved', 'dismissed'] },
+    createdAt: { $lt: cutoff },
+  });
+  return result.deletedCount;
+}
+
 async function logCleanup(name, fn) {
   try {
     const count = await fn();
@@ -146,17 +163,28 @@ const LIGHT_TASKS = [
 const HEAVY_TASKS = [
   ['orphaned notifications', cleanupOrphanedNotifications],
   ['orphaned comments', cleanupOrphanedComments],
-  ['orphaned bookmarks', cleanupOrphanedBookmarks],
-  ['orphaned ratings', cleanupOrphanedRatings],
-  ['orphaned reports', cleanupOrphanedReports],
   ['stale comment likes', cleanupStaleCommentLikes],
   ['expired ads', cleanupExpiredAds],
+  ['stale unapproved notes (>90d)', cleanupStaleUnapprovedNotes],
 ];
+
+async function runOrphanedNoteCleanup() {
+  const existingNoteIds = await Note.distinct('_id');
+  const tasks = [
+    ['orphaned bookmarks', () => cleanupOrphanedBookmarks(existingNoteIds)],
+    ['orphaned ratings', () => cleanupOrphanedRatings(existingNoteIds)],
+    ['orphaned reports', () => cleanupOrphanedReports(existingNoteIds)],
+  ];
+  for (const [name, fn] of tasks) {
+    await logCleanup(name, fn);
+  }
+}
 
 const PRUNE_TASKS = [
   ['old contact messages (>90d)', cleanupOldContactMessages],
   ['old audit logs (>90d)', cleanupOldAuditLogs],
   ['old notifications (>30d)', cleanupOldNotifications],
+  ['old resolved reports (>180d)', cleanupOldResolvedReports],
 ];
 
 async function runTasks(tasks) {
@@ -168,7 +196,7 @@ async function runTasks(tasks) {
 export function startCleanupScheduler() {
   console.log('[Cleanup] Scheduler started');
 
-  runTasks([...LIGHT_TASKS, ...HEAVY_TASKS, ...PRUNE_TASKS]).catch(err => {
+  runTasks([...LIGHT_TASKS, ...HEAVY_TASKS]).then(() => runOrphanedNoteCleanup()).then(() => runTasks(PRUNE_TASKS)).catch(err => {
     console.error('[Cleanup] Initial run failed:', err.message);
   });
   console.log('[Cleanup] Initial run triggered');
@@ -176,7 +204,7 @@ export function startCleanupScheduler() {
   setInterval(() => runTasks(LIGHT_TASKS).catch(err => {
     console.error('[Cleanup] Light tasks failed:', err.message);
   }), 1 * HOUR);
-  setInterval(() => runTasks(HEAVY_TASKS).catch(err => {
+  setInterval(() => runTasks(HEAVY_TASKS).then(() => runOrphanedNoteCleanup()).catch(err => {
     console.error('[Cleanup] Heavy tasks failed:', err.message);
   }), 6 * HOUR);
   setInterval(() => runTasks(PRUNE_TASKS).catch(err => {

@@ -39,13 +39,19 @@ export default function SemesterDetail() {
   if (!semester) return <div className="empty-state"><h3>Not found</h3></div>;
 
   return (
-    <div style={{ padding: '100px 5% 60px', maxWidth: 1200, margin: '0 auto' }}>
-      <Link to={`/courses/${semester.courseId?._id}`}
+    <div className="detail-page" style={{ padding: '100px 5% 60px', maxWidth: 1200, margin: '0 auto' }}>
+      <div className="mobile-breadcrumb">
+        <Link to={`/courses/${semester.courseId?._id}`} className="mobile-breadcrumb-back"><ArrowLeft size={14} /></Link>
+        <span className="mobile-breadcrumb-text">{semester.courseId?.name}</span>
+        <span className="mobile-breadcrumb-sep">/</span>
+        <span className="mobile-breadcrumb-current">{semester.title}</span>
+      </div>
+      <Link to={`/courses/${semester.courseId?._id}`} className="hide-mobile-breadcrumb"
         style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 14, marginBottom: 16, textDecoration: 'none' }}>
         <ArrowLeft size={16} /> {semester.courseId?.name}
       </Link>
 
-      <div className="detail-grid" style={{ gridTemplateColumns: '1fr 420px' }}>
+      <div className="detail-grid detail-grid-sidebar">
         <div>
           <div className="hierarchy-card" style={{ borderLeftColor: 'var(--palette-3)', cursor: 'default' }}>
             <span className="hierarchy-card-badge" style={{ background: 'var(--palette-3-bg)', color: 'var(--palette-3)' }}>

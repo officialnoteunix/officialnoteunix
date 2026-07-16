@@ -1,0 +1,99 @@
+.table-container {
+  background-color: var(--bg-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  margin-top: 24px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.data-table th {
+  background-color: var(--bg-subtle);
+  padding: 16px 24px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.data-table td {
+  padding: 18px 24px;
+  font-size: 14px;
+  color: var(--text-main);
+  border-bottom: 1px solid var(--border-color);
+  transition: var(--transition);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover td {
+  background-color: var(--bg-app);
+}
+
+/* Mobile card layout */
+@media (max-width: 640px) {
+  .table-container {
+    overflow: visible;
+    border: none;
+    background: transparent;
+  }
+  .data-table th {
+    display: none;
+  }
+  .data-table thead {
+    display: none;
+  }
+  .data-table tbody tr {
+    display: block;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    margin-bottom: 10px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .data-table tbody tr:active {
+    background: var(--bg-subtle);
+  }
+  .data-table td {
+    display: none;
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+    white-space: normal !important;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    min-width: 0;
+  }
+  .data-table td[data-card-title] {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .data-table td[data-card-title]:last-child {
+    margin-bottom: 0;
+  }
+  /* Truncate long text in cards */
+  .data-table td[data-card-title] .msg-truncate,
+  .data-table td[data-card-title] > .comment-content {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  /* Action buttons wrap */
+  .data-table td[data-card-title="Actions"] > div {
+    flex-wrap: wrap;
+  }
+}

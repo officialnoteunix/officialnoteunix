@@ -6,7 +6,6 @@ const footerLinks = [
     links: [
       { label: 'Browse Notes', to: '/notes' },
       { label: 'Leaderboard', to: '/leaderboard' },
-      { label: 'Search', to: '/search' },
     ],
   },
   {

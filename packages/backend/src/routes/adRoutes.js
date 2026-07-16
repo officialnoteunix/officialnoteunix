@@ -1,6 +1,22 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import Ad from '../models/Ad.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { logAudit } from '../services/auditLogger.js';
+
+const impressionLimiter = rateLimit({
+  windowMs: 1000,
+  max: 1,
+  keyGenerator: (req) => req.ip || req.connection.remoteAddress,
+  message: { success: false, message: 'Too many ad impression requests, try again later' },
+});
+
+const clickLimiter = rateLimit({
+  windowMs: 5000,
+  max: 1,
+  keyGenerator: (req) => req.ip || req.connection.remoteAddress,
+  message: { success: false, message: 'Too many ad click requests, try again later' },
+});
 
 const router = Router();
 
@@ -62,7 +78,7 @@ router.get('/stats/range', authenticate, authorize('admin'), async (req, res, ne
     const { start, end } = req.query;
     const query = {};
     if (start) query.startDate = { $gte: new Date(start) };
-    if (end) query.endDate = { ...query.endDate, $lte: new Date(end) };
+    if (end) query.endDate = { $lte: new Date(end) };
     const ads = await Ad.find(query);
     res.json({ success: true, data: ads });
   } catch (err) { next(err); }
@@ -78,14 +94,18 @@ router.get('/:id', authenticate, authorize('admin'), async (req, res, next) => {
 
 router.post('/', authenticate, authorize('admin'), async (req, res, next) => {
   try {
-    const ad = await Ad.create(req.body);
+    const { slot, imageUrl, linkUrl, description, startDate, endDate, active } = req.body;
+    if (!slot || !imageUrl || !startDate || !endDate) {
+      return res.status(400).json({ success: false, message: 'slot, imageUrl, startDate, and endDate are required' });
+    }
+    const ad = await Ad.create({ slot, imageUrl, linkUrl, description, startDate, endDate, active });
     res.status(201).json({ success: true, data: ad });
   } catch (err) { next(err); }
 });
 
 router.patch('/:id', authenticate, authorize('admin'), async (req, res, next) => {
   try {
-    const ad = await Ad.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const ad = await Ad.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!ad) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true, data: ad });
   } catch (err) { next(err); }
@@ -93,19 +113,26 @@ router.patch('/:id', authenticate, authorize('admin'), async (req, res, next) =>
 
 router.delete('/:id', authenticate, authorize('admin'), async (req, res, next) => {
   try {
+    const ad = await Ad.findById(req.params.id);
+    if (!ad) return res.status(404).json({ success: false, message: 'Not found' });
     await Ad.findByIdAndDelete(req.params.id);
+    await logAudit({
+      adminId: req.user._id, adminEmail: req.user.email,
+      action: 'ad_delete', targetType: 'ad', targetId: ad._id,
+      targetTitle: ad.description || ad.slot || 'Ad',
+    });
     res.json({ success: true, message: 'Deleted' });
   } catch (err) { next(err); }
 });
 
-router.post('/:id/impression', async (req, res, next) => {
+router.post('/:id/impression', impressionLimiter, async (req, res, next) => {
   try {
     const ad = await Ad.findByIdAndUpdate(req.params.id, { $inc: { impressions: 1 } }, { new: true });
     res.json({ success: true, data: ad });
   } catch (err) { next(err); }
 });
 
-router.post('/:id/click', async (req, res, next) => {
+router.post('/:id/click', clickLimiter, async (req, res, next) => {
   try {
     const ad = await Ad.findByIdAndUpdate(req.params.id, { $inc: { clicks: 1 } }, { new: true });
     res.json({ success: true, data: ad });

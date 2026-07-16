@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Heart, Reply, Trash2, ChevronDown, ChevronRight, User } from 'lucide-react';
+import { MessageSquare, Heart, Reply, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { commentApi } from '../../api/comment';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -8,7 +8,7 @@ import { useToast } from '../../context/ToastContext';
 interface Comment {
   _id: string;
   noteId: string;
-  userId: { _id: string; fullname: string; email: string; avatar?: string | null };
+  userId: { _id: string; fullname: string; email: string; avatar?: string | null } | null;
   content: string;
   parentComment: string | null;
   likes: string[];
@@ -132,10 +132,16 @@ function CommentThread({ comment, currentUser, onReply, onDelete }: {
   const [replying, setReplying] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
+
+  const authorName = comment.userId?.fullname || 'Deleted User';
+  const authorInitial = authorName.charAt(0).toUpperCase();
+  const likes = comment.likes || [];
+  const replies = comment.replies || [];
+
   const [liked, setLiked] = useState(
-    currentUser ? comment.likes.includes(currentUser.id) : false
+    currentUser ? likes.includes(currentUser.id) : false
   );
-  const [likesCount, setLikesCount] = useState(comment.likes.length);
+  const [likesCount, setLikesCount] = useState(likes.length);
 
   const handleLike = async () => {
     if (!currentUser) { navigate('/login'); return; }
@@ -163,21 +169,20 @@ function CommentThread({ comment, currentUser, onReply, onDelete }: {
     }
   };
 
-  const isOwner = currentUser && currentUser.id === comment.userId._id;
+  const isOwner = currentUser && comment.userId?._id === currentUser.id;
   const isAdmin = currentUser?.role === 'admin';
   const timeAgo = getTimeAgo(comment.createdAt);
-  const initial = comment.userId.fullname.charAt(0).toUpperCase();
 
   return (
     <div className="comment-thread">
       <div className="comment-card">
-        <div className="comment-avatar">{initial}</div>
+        <div className="comment-avatar">{authorInitial}</div>
         <div className="comment-body">
           <div className="comment-meta">
-            <span className="comment-author">{comment.userId.fullname}</span>
+            <span className="comment-author">{authorName}</span>
             <span className="comment-time">{timeAgo}</span>
           </div>
-          <div className="comment-content">{comment.content}</div>
+          <div className="comment-content">{renderContent(comment.content)}</div>
           <div className="comment-actions">
             <button className="comment-action-btn" onClick={handleLike}>
               <Heart size={13} fill={liked ? 'var(--danger)' : 'none'} color={liked ? 'var(--danger)' : 'var(--text-light)'} />
@@ -220,13 +225,13 @@ function CommentThread({ comment, currentUser, onReply, onDelete }: {
         </div>
       </div>
 
-      {comment.replies && comment.replies.length > 0 && (
+      {replies.length > 0 && (
         <div className="comment-replies">
           <button className="comment-toggle-replies" onClick={() => setShowReplies(!showReplies)}>
             {showReplies ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            {showReplies ? 'Hide replies' : `${comment.replies.length} ${comment.replies.length === 1 ? 'reply' : 'replies'}`}
+            {showReplies ? 'Hide replies' : `${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
           </button>
-          {showReplies && comment.replies.map(reply => (
+          {showReplies && replies.map(reply => (
             <CommentThread
               key={reply._id}
               comment={reply}
@@ -241,6 +246,28 @@ function CommentThread({ comment, currentUser, onReply, onDelete }: {
   );
 }
 
+const URL_RE = /https?:\/\/[^\s<>"')\]]+/g;
+
+function renderContent(text: string) {
+  const parts = text.split(URL_RE);
+  const urls = text.match(URL_RE) || [];
+  const result: React.ReactNode[] = [];
+  parts.forEach((part, i) => {
+    if (part) result.push(<span key={`t${i}`}>{part}</span>);
+    if (urls[i]) {
+      const url = urls[i];
+      result.push(
+        <a key={`u${i}`} href={url} target="_blank" rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          style={{ color: 'var(--primary)', textDecoration: 'underline', wordBreak: 'break-all' }}>
+          {url}
+        </a>
+      );
+    }
+  });
+  return result;
+}
+
 function getTimeAgo(date: string): string {
   const now = Date.now();
   const diff = now - new Date(date).getTime();
@@ -250,6 +277,7 @@ function getTimeAgo(date: string): string {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
+  if (days === 1) return 'Yesterday';
   if (days < 7) return `${days}d ago`;
   return new Date(date).toLocaleDateString();
 }

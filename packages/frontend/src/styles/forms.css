@@ -1,0 +1,99 @@
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-subtle);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  font-size: 14px;
+  transition: var(--transition);
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: var(--primary);
+  background-color: var(--bg-surface);
+}
+
+.form-select {
+  width: 100%;
+  padding: 11px 40px 11px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-color);
+  background-color: var(--bg-subtle);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-main);
+  letter-spacing: 0.01em;
+  transition: border-color 0.25s ease, background-color 0.25s ease, box-shadow 0.25s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+  cursor: pointer;
+  outline: none;
+  line-height: 1.5;
+}
+
+.form-select:hover:not(:disabled) {
+  border-color: var(--border-focus);
+  background-color: var(--bg-card);
+}
+
+.form-select:focus {
+  border-color: var(--primary);
+  background-color: var(--bg-card);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background-color: var(--bg-app);
+  border-color: var(--border-color);
+}
+
+.dark-mode .form-select:focus {
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
+}
+
+.dark-mode .form-select:disabled {
+  opacity: 0.35;
+}
+
+.form-select option {
+  font-size: 13.5px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  color: var(--text-main);
+}
+
+.form-select option:disabled {
+  color: var(--text-light);
+}
+
+.dark-mode .form-select option {
+  background: var(--bg-surface);
+}
+
+textarea.form-input {
+  resize: vertical;
+  min-height: 100px;
+}

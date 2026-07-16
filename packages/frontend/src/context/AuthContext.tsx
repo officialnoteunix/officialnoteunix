@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await authApi.register(fullname, email, password);
     const userData = res.data.data.user;
     setUser(userData);
-    return userData;
+    return { ...userData, emailWarning: res.data.emailWarning };
   };
 
   const logout = async () => {

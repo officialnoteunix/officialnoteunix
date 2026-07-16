@@ -6,8 +6,9 @@ const auditLogSchema = new mongoose.Schema({
   action: {
     type: String,
     enum: [
-      'note_approve', 'note_reject', 'note_delete',
+      'note_approve', 'note_reject', 'note_delete', 'note_edit',
       'user_ban', 'user_unban', 'user_suspend', 'user_delete',
+      'user_verify', 'user_unverify',
       'comment_delete',
       'report_resolve', 'report_dismiss',
       'send_email', 'ad_create', 'ad_update', 'ad_delete',

@@ -1,4 +1,5 @@
 import multer from 'multer';
+import { MAX_FILE_SIZE, MAX_IMAGE_SIZE } from '../utils/constants.js';
 
 const storage = multer.memoryStorage();
 
@@ -24,33 +25,52 @@ export function validateImageBuffer(buffer, mimetype) {
   if (type === 'png') return startsWithMagic(buffer, IMAGE_MAGICS.png);
   if (type === 'gif') return startsWithMagic(buffer, IMAGE_MAGICS.gif);
   if (type === 'webp') return startsWithMagic(buffer, IMAGE_MAGICS.webp);
-  return true;
+  return false;
 }
 
+const ALLOWED_MIMES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'text/rtf',
+  'application/rtf',
+  'application/vnd.oasis.opendocument.text',
+  'application/vnd.oasis.opendocument.presentation',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+];
+
+const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype === 'application/pdf') {
+  if (ALLOWED_MIMES.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Only PDF files are allowed'), false);
+    cb(new Error('Unsupported file type. Allowed: PDF, DOCX, PPTX, XLSX, TXT, RTF, ODF, images'), false);
   }
 };
 
 const imageFilter = (req, file, cb) => {
-  if (file.mimetype && file.mimetype.startsWith('image/')) {
+  if (ALLOWED_IMAGE_MIMES.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Only image files are allowed'), false);
+    cb(new Error('Only JPEG, PNG, GIF, or WebP images are allowed'), false);
   }
 };
 
 export const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: MAX_FILE_SIZE },
 });
 
 export const uploadImage = multer({
   storage,
   fileFilter: imageFilter,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: MAX_IMAGE_SIZE },
 });

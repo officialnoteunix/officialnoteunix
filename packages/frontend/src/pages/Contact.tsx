@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Mail, MessageSquare, Send, MapPin, Clock, Loader2 } from 'lucide-react';
+import { Send, MapPin, Mail, MessageSquare, Clock, Loader2 } from 'lucide-react';
+import Select from '../components/ui/Select';
 import { useToast } from '../context/ToastContext';
 import { getApiError } from '../utils/constants';
 import { contactApi } from '../api/contact';
@@ -38,7 +39,7 @@ export default function Contact() {
           <div className="contact-grid">
             <div className="faq-grid">
               {[
-                { icon: <Mail size={20} />, title: 'Email', text: 'support@noteunix.com', desc: 'We reply within 24 hours' },
+                { icon: <Mail size={20} />, title: 'Email', text: 'official@noteunix.com', desc: 'We reply within 24 hours' },
                 { icon: <MapPin size={20} />, title: 'Location', text: 'Kathmandu, Nepal', desc: 'Virtual team' },
                 { icon: <Clock size={20} />, title: 'Response Time', text: 'Mon–Fri, 9AM–6PM', desc: 'Nepal Time (UTC+5:45)' },
                 { icon: <MessageSquare size={20} />, title: 'Social', text: '@noteunix', desc: 'Follow us for updates' },
@@ -82,20 +83,17 @@ export default function Contact() {
                     background: 'var(--bg-subtle)', color: 'var(--text-main)', fontSize: 14, outline: 'none',
                   }}
                 />
-                <select
+                <Select
                   value={form.topic}
-                  onChange={e => setForm(p => ({ ...p, topic: e.target.value }))}
-                  style={{
-                    padding: '14px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)',
-                    background: 'var(--bg-subtle)', color: 'var(--text-main)', fontSize: 14, outline: 'none',
-                  }}
-                >
-                  <option value="">Select a topic</option>
-                  <option value="general">General Inquiry</option>
-                  <option value="support">Technical Support</option>
-                  <option value="report">Report Content</option>
-                  <option value="feedback">Feedback</option>
-                </select>
+                  onChange={val => setForm(p => ({ ...p, topic: val }))}
+                  options={[
+                    { value: '', label: 'Select a topic' },
+                    { value: 'general', label: 'General Inquiry' },
+                    { value: 'support', label: 'Technical Support' },
+                    { value: 'report', label: 'Report Content' },
+                    { value: 'feedback', label: 'Feedback' },
+                  ]}
+                />
                 <textarea
                   placeholder="Your message..."
                   rows={5}

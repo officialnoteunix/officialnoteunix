@@ -72,7 +72,7 @@ export default function AdminLayout() {
     { to: '/admin/messages', label: 'Messages', icon: MessageSquare, category: 'Moderation', badge: badgeNew(stats.unreadContactMessages, seenMessages) },
     { to: '/admin/audit-logs', label: 'Audit Logs', icon: Shield, category: 'Moderation', badge: badgeNew(stats.recentAuditLogs, seenAudit) },
     { to: '/admin/mail', label: 'Mail', icon: MailIcon, category: 'Support' },
-    { to: '/notifications', label: 'Notifications', icon: Bell, category: 'Support', badge: unreadCount },
+    { to: '/admin/notifications', label: 'Notifications', icon: Bell, category: 'Support', badge: unreadCount },
   ];
 
   const currentPage = links.find(l => l.to === pathname)?.label || 'Dashboard';

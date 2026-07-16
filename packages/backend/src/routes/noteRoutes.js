@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import https from 'https';
 import rateLimit from 'express-rate-limit';
 import Note from '../models/Note.js';
 import Comment from '../models/Comment.js';
@@ -6,13 +7,13 @@ import Bookmark from '../models/Bookmark.js';
 import Rating from '../models/Rating.js';
 import Report from '../models/Report.js';
 import Notification from '../models/Notification.js';
-import cloudinary from '../config/cloudinary.js';
 import { authenticate, optionalAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { upload, validatePdfBuffer } from '../middleware/upload.js';
 import { createNoteSchema, updateNoteSchema } from '../validators/noteValidator.js';
 import { escapeRegex } from '../utils/escapeRegex.js';
-import { safeLimit, safePage } from '../utils/constants.js';
+import { safeLimit, safePage, EXT_TO_MIME } from '../utils/constants.js';
+import { uploadFiles, uploadThumbnail, deleteFile, deleteNoteFiles, extractPublicId } from '../utils/uploadCloudinary.js';
 
 const downloadLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -24,11 +25,12 @@ const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { subjectId, courseId, universityId, search, page = 1, limit = 20 } = req.query;
+    const { subjectId, search, resourceType, page = 1, limit = 20 } = req.query;
     const safeLim = safeLimit(limit);
     const safePg = safePage(page);
     const query = { approved: true };
     if (subjectId) query.subjectId = subjectId;
+    if (resourceType) query.resourceType = resourceType;
     if (search) {
       const escaped = escapeRegex(search);
       query.$or = [
@@ -121,6 +123,23 @@ router.get('/:id', optionalAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/:id/related', async (req, res, next) => {
+  try {
+    const note = await Note.findById(req.params.id).select('subjectId');
+    if (!note) return res.status(404).json({ success: false, message: 'Not found' });
+    const related = await Note.find({
+      _id: { $ne: note._id },
+      subjectId: note.subjectId,
+      approved: true,
+    })
+      .sort({ downloads: -1 })
+      .limit(4)
+      .populate('userId', 'fullname avatar')
+      .populate('subjectId', 'name');
+    res.json({ success: true, data: related });
+  } catch (err) { next(err); }
+});
+
 router.get('/:id/share', async (req, res, next) => {
   try {
     const note = await Note.findById(req.params.id)
@@ -142,31 +161,62 @@ router.get('/:id/share', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', authenticate, upload.single('file'), validate(createNoteSchema), async (req, res, next) => {
+router.post('/', authenticate, upload.fields([
+  { name: 'files', maxCount: 10 },
+  { name: 'thumbnail', maxCount: 1 },
+]), validate(createNoteSchema), async (req, res, next) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'File is required' });
-    }
-    if (!validatePdfBuffer(req.file.buffer)) {
-      return res.status(400).json({ success: false, message: 'File content does not match PDF format' });
+    const uploaded = req.files?.files || [];
+    if (!uploaded.length) {
+      return res.status(400).json({ success: false, message: 'At least one file is required' });
     }
 
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder: 'noteunix/notes', resource_type: 'auto' },
-        (err, result) => (err ? reject(err) : resolve(result))
-      );
-      stream.end(req.file.buffer);
-    });
-    const note = await Note.create({
-      subjectId: req.validatedBody.subjectId,
-      userId: req.user._id,
-      title: req.validatedBody.title,
-      description: req.validatedBody.description,
-      cloudinaryUrl: result.secure_url,
-      fileType: 'pdf',
-      fileSize: req.file.size,
-    });
+    for (const f of uploaded) {
+      if (f.mimetype === 'application/pdf' && !validatePdfBuffer(f.buffer)) {
+        return res.status(400).json({ success: false, message: `File "${f.originalname}" is not a valid PDF` });
+      }
+    }
+
+    let files;
+    let thumbnailUrl = '';
+    try {
+      files = await uploadFiles(uploaded);
+      const thumbFile = req.files?.thumbnail?.[0];
+      if (thumbFile) {
+        thumbnailUrl = await uploadThumbnail(thumbFile.buffer);
+      }
+    } catch (uploadErr) {
+      if (files?.length) {
+        await Promise.all(files.map(f => {
+          const pid = extractPublicId(f.url);
+          return pid ? deleteFile(pid).catch(() => {}) : Promise.resolve();
+        }));
+      }
+      throw uploadErr;
+    }
+
+    let note;
+    try {
+      note = await Note.create({
+        subjectId: req.validatedBody.subjectId,
+        userId: req.user._id,
+        title: req.validatedBody.title,
+        description: req.validatedBody.description,
+        resourceType: req.validatedBody.resourceType,
+        files,
+        thumbnailUrl,
+      });
+    } catch (dbErr) {
+      await Promise.all(files.map(f => {
+        const pid = extractPublicId(f.url);
+        return pid ? deleteFile(pid).catch(() => {}) : Promise.resolve();
+      }));
+      if (thumbnailUrl) {
+        const pid = extractPublicId(thumbnailUrl);
+        if (pid) await deleteFile(pid).catch(() => {});
+      }
+      throw dbErr;
+    }
 
     await Notification.create({
       userId: req.user._id,
@@ -180,20 +230,64 @@ router.post('/', authenticate, upload.single('file'), validate(createNoteSchema)
   } catch (err) { next(err); }
 });
 
-router.patch('/:id', authenticate, validate(updateNoteSchema), async (req, res, next) => {
+router.patch('/:id', authenticate, (req, res, next) => {
+  if (req.is('multipart/form-data')) {
+    upload.fields([
+      { name: 'files', maxCount: 10 },
+      { name: 'thumbnail', maxCount: 1 },
+    ])(req, res, (err) => {
+      if (err) return next(err);
+      next();
+    });
+  } else {
+    next();
+  }
+}, validate(updateNoteSchema), async (req, res, next) => {
   try {
     const note = await Note.findById(req.params.id);
     if (!note) return res.status(404).json({ success: false, message: 'Not found' });
     if (note.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
-    Object.assign(note, req.validatedBody);
+    const updates = { ...req.validatedBody };
+
+    const uploaded = req.files?.files || [];
+    if (uploaded.length) {
+      for (const f of uploaded) {
+        if (f.mimetype === 'application/pdf' && !validatePdfBuffer(f.buffer)) {
+          return res.status(400).json({ success: false, message: `File "${f.originalname}" is not a valid PDF` });
+        }
+      }
+      const oldFiles = note.files?.length ? [...note.files] : [];
+      const oldThumb = note.thumbnailUrl || '';
+      updates.files = await uploadFiles(uploaded);
+      await Promise.all(oldFiles.map(f => {
+        const pid = extractPublicId(f.url);
+        return pid ? deleteFile(pid).catch(() => {}) : Promise.resolve();
+      }));
+      if (oldThumb) {
+        const pid = extractPublicId(oldThumb);
+        if (pid) await deleteFile(pid).catch(() => {});
+      }
+    }
+
+    const thumbFile = req.files?.thumbnail?.[0];
+    if (thumbFile) {
+      const oldThumb = note.thumbnailUrl || '';
+      updates.thumbnailUrl = await uploadThumbnail(thumbFile.buffer);
+      if (oldThumb) {
+        const pid = extractPublicId(oldThumb);
+        if (pid) await deleteFile(pid).catch(() => {});
+      }
+    }
+
+    Object.assign(note, updates);
     await note.save();
     res.json({ success: true, data: note });
   } catch (err) { next(err); }
 });
 
-router.post('/:id/download', authenticate, downloadLimiter, async (req, res, next) => {
+router.post('/:id/download', optionalAuth, downloadLimiter, async (req, res, next) => {
   try {
     const note = await Note.findByIdAndUpdate(
       req.params.id,
@@ -202,6 +296,40 @@ router.post('/:id/download', authenticate, downloadLimiter, async (req, res, nex
     );
     if (!note) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true, data: { downloads: note.downloads } });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/download/file/:fileIdx(\\d+)?', optionalAuth, downloadLimiter, async (req, res, next) => {
+  try {
+    const note = await Note.findById(req.params.id);
+    if (!note) return res.status(404).json({ success: false, message: 'Not found' });
+    if (!note.approved) return res.status(404).json({ success: false, message: 'Not found' });
+
+    const fileIdx = parseInt(req.params.fileIdx || '0', 10);
+    let fileUrl, ext;
+    if (note.files?.length) {
+      const f = note.files[fileIdx];
+      if (!f) return res.status(404).json({ success: false, message: 'File not found' });
+      fileUrl = f.url;
+      ext = f.fileType || 'pdf';
+    } else {
+      const raw = note._doc || {};
+      if (!raw.cloudinaryUrl) return res.status(404).json({ success: false, message: 'File not found' });
+      fileUrl = raw.cloudinaryUrl;
+      ext = raw.fileType || (raw.cloudinaryUrl.split('?')[0].split('.').pop()?.toLowerCase() || 'pdf');
+    }
+
+    const filename = `${note.title.replace(/[^a-zA-Z0-9 ]/g, '_')}.${ext}`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', EXT_TO_MIME[ext] || 'application/octet-stream');
+
+    https.get(fileUrl, (cloudRes) => {
+      if (cloudRes.statusCode >= 300 && cloudRes.headers.location) {
+        https.get(cloudRes.headers.location, (redirectRes) => redirectRes.pipe(res));
+        return;
+      }
+      cloudRes.pipe(res);
+    });
   } catch (err) { next(err); }
 });
 
@@ -218,17 +346,7 @@ router.delete('/:id', authenticate, async (req, res, next) => {
       Rating.deleteMany({ noteId: note._id }),
       Report.deleteMany({ note: note._id }),
     ]);
-    if (note.cloudinaryUrl) {
-      try {
-        const parts = note.cloudinaryUrl.split('/upload/');
-        if (parts[1]) {
-          const publicId = parts[1].replace(/\.[^.]+$/, '');
-          await cloudinary.uploader.destroy(publicId);
-        }
-      } catch (cloudErr) {
-        console.warn('Cloudinary delete failed for note', note._id, cloudErr.message);
-      }
-    }
+    await deleteNoteFiles(note);
     await Note.findByIdAndDelete(note._id);
     res.json({ success: true, message: 'Deleted' });
   } catch (err) { next(err); }

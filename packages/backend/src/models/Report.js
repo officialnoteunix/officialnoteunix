@@ -9,5 +9,6 @@ const reportSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 reportSchema.index({ note: 1 });
+reportSchema.index({ reportedBy: 1, createdAt: -1 });
 
 export default mongoose.model('Report', reportSchema);

@@ -43,7 +43,9 @@ export default function Modal({ open, onClose, title, children, width }: ModalPr
             </button>
           </div>
         )}
-        {children}
+        <div className="modal-body">
+          {children}
+        </div>
       </div>
     </div>,
     document.body

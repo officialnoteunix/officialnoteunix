@@ -7,7 +7,8 @@ import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/auth.js';
 import { registerSchema, loginSchema } from '../validators/authValidator.js';
 import { generateAccessToken, generateRefreshToken } from '../utils/generateToken.js';
-import { sendWelcomeEmail, sendResetEmail, sendPasswordChangedEmail, sendVerificationEmail } from '../config/email.js';
+import { setAuthCookies, clearAuthCookies } from '../utils/cookies.js';
+import { sendWelcomeEmail, sendResetEmail, sendPasswordChangedEmail, sendVerificationEmail, getEmailRetryInfo } from '../config/email.js';
 import passport from 'passport';
 
 const router = Router();
@@ -34,23 +35,31 @@ router.post('/register', validate(registerSchema), async (req, res, next) => {
       link: '/user/dashboard',
     });
     const verifyUrl = `${process.env.CORS_ORIGIN || 'http://localhost:5173'}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`;
-    try { await sendVerificationEmail(email, verifyUrl, fullname); } catch {
-      console.warn(`[AUTH] Verification email failed for ${email} — user registered but email not sent`);
+    let emailSent = true;
+    let emailRetryHours = null;
+    try {
+      const result = await sendVerificationEmail(email, verifyUrl, fullname);
+      if (result && !result.success) {
+        emailSent = false;
+        emailRetryHours = result.retryHours || null;
+      }
+    } catch (err) {
+      console.warn(`[AUTH] Verification email failed for ${email}:`, err.message);
+      emailSent = false;
+      const retry = getEmailRetryInfo();
+      emailRetryHours = retry.hours;
     }
     const accessToken = generateAccessToken(user);
     const { token: refreshToken, prefix: refreshTokenPrefix } = generateRefreshToken();
     user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
     user.refreshTokenPrefix = refreshTokenPrefix;
     await user.save();
-    res.cookie('accessToken', accessToken, {
-      httpOnly: true, secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', maxAge: 15 * 60 * 1000,
-    });
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true, secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
-    res.status(201).json({ success: true, data: { user: user.toPublicJSON() } });
+    setAuthCookies(res, accessToken, refreshToken);
+    const response = { success: true, data: { user: user.toPublicJSON() } };
+    if (!emailSent) {
+      response.emailWarning = { message: 'Email service is temporarily unavailable. You can still use your account but please verify your email later.', retryHours: emailRetryHours };
+    }
+    res.status(201).json(response);
   } catch (err) { next(err); }
 });
 
@@ -75,14 +84,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
     user.refreshTokenPrefix = refreshTokenPrefix;
     await user.save();
-    res.cookie('accessToken', accessToken, {
-      httpOnly: true, secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', maxAge: 15 * 60 * 1000,
-    });
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true, secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    setAuthCookies(res, accessToken, refreshToken);
     res.json({ success: true, data: { user: user.toPublicJSON() } });
   } catch (err) { next(err); }
 });
@@ -113,14 +115,7 @@ router.post('/refresh', async (req, res, next) => {
     matchedUser.refreshTokenPrefix = newPrefix;
     await matchedUser.save();
 
-    res.cookie('accessToken', accessToken, {
-      httpOnly: true, secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', maxAge: 15 * 60 * 1000,
-    });
-    res.cookie('refreshToken', newRefreshToken, {
-      httpOnly: true, secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    setAuthCookies(res, accessToken, newRefreshToken);
     res.json({ success: true, message: 'Token refreshed' });
   } catch (err) { next(err); }
 });
@@ -133,8 +128,7 @@ router.post('/logout', authenticate, async (req, res, next) => {
       user.refreshTokenPrefix = null;
       await user.save();
     }
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    clearAuthCookies(res);
     res.json({ success: true, message: 'Logged out' });
   } catch (err) { next(err); }
 });
@@ -164,8 +158,8 @@ router.get('/verify-email', async (req, res, next) => {
     user.emailVerifyToken = undefined;
     user.emailVerifyExpiry = undefined;
     await user.save();
-    try { await sendWelcomeEmail(email, user.fullname); } catch {
-      console.warn(`[AUTH] Welcome email failed for ${email}`);
+    try { await sendWelcomeEmail(email, user.fullname); } catch (err) {
+      console.warn(`[AUTH] Welcome email failed for ${email}:`, err.message);
     }
     res.json({ success: true, message: 'Email verified successfully' });
   } catch (err) { next(err); }
@@ -183,8 +177,16 @@ router.post('/resend-verification', async (req, res, next) => {
     user.emailVerifyExpiry = new Date(Date.now() + 1 * 60 * 60 * 1000);
     await user.save();
     const verifyUrl = `${process.env.CORS_ORIGIN || 'http://localhost:5173'}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`;
-    try { await sendVerificationEmail(email, verifyUrl, user.fullname); } catch {
-      console.warn(`[AUTH] Resend verification email failed for ${email}`);
+    try {
+      const result = await sendVerificationEmail(email, verifyUrl, user.fullname);
+      if (result && !result.success) {
+        const retry = getEmailRetryInfo();
+        return res.status(503).json({ success: false, message: `Email service is temporarily unavailable. Please try again in ${retry.hours} hour${retry.hours > 1 ? 's' : ''}.`, retryHours: retry.hours });
+      }
+    } catch (err) {
+      console.warn(`[AUTH] Resend verification email failed for ${email}:`, err.message);
+      const retry = getEmailRetryInfo();
+      return res.status(503).json({ success: false, message: `Email service is temporarily unavailable. Please try again in ${retry.hours} hour${retry.hours > 1 ? 's' : ''}.`, retryHours: retry.hours });
     }
     res.json({ success: true, message: 'Verification email sent' });
   } catch (err) { next(err); }
@@ -201,8 +203,16 @@ router.post('/forgot-password', async (req, res, next) => {
     user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
     await user.save();
     const resetUrl = `${process.env.CORS_ORIGIN || 'http://localhost:5173'}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
-    try { await sendResetEmail(email, resetUrl); } catch (err) {
+    try {
+      const result = await sendResetEmail(email, resetUrl);
+      if (result && !result.success) {
+        const retry = getEmailRetryInfo();
+        return res.status(503).json({ success: false, message: `Email service is temporarily unavailable. Please try again in ${retry.hours} hour${retry.hours > 1 ? 's' : ''}.`, retryHours: retry.hours });
+      }
+    } catch (err) {
       console.warn(`[AUTH] Reset email failed for ${email}:`, err.message);
+      const retry = getEmailRetryInfo();
+      return res.status(503).json({ success: false, message: `Email service is temporarily unavailable. Please try again in ${retry.hours} hour${retry.hours > 1 ? 's' : ''}.`, retryHours: retry.hours });
     }
     res.json({ success: true, message: 'If an account exists, a reset link has been sent.' });
   } catch (err) { next(err); }
@@ -258,14 +268,7 @@ router.get('/google/callback',
       user.refreshTokenPrefix = refreshTokenPrefix;
       await user.save();
 
-      res.cookie('accessToken', accessToken, {
-        httpOnly: true, secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax', maxAge: 15 * 60 * 1000,
-      });
-      res.cookie('refreshToken', refreshToken, {
-        httpOnly: true, secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax', maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
+      setAuthCookies(res, accessToken, refreshToken);
       res.redirect(`${process.env.CORS_ORIGIN || 'http://localhost:5173'}/user/dashboard`);
     } catch (err) { next(err); }
   }

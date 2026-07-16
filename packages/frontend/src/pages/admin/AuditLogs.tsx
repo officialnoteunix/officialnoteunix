@@ -77,7 +77,7 @@ export default function AuditLogs() {
                   const Icon = meta.icon;
                   return (
                     <tr key={log._id}>
-                      <td style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <td data-card-title="Admin" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <div className="user-avatar" style={{ width: 24, height: 24, fontSize: 9 }}>
                           {log.adminId?.fullname?.charAt(0) || 'A'}
                         </div>
@@ -86,20 +86,20 @@ export default function AuditLogs() {
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{log.adminId?.email || ''}</div>
                         </div>
                       </td>
-                      <td>
+                      <td data-card-title="Action">
                         <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}>
                           <Icon size={14} style={{ color: meta.color }} />
                           <span style={{ color: meta.color }}>{meta.label}</span>
                         </span>
                       </td>
-                      <td style={{ fontSize: 13 }}>
+                      <td data-card-title="Target" style={{ fontSize: 13 }}>
                         <span style={{ textTransform: 'capitalize', color: 'var(--text-muted)', fontSize: 11 }}>{log.targetType}</span>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{log.targetTitle || log.targetId}</div>
                       </td>
-                      <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td data-card-title="Details" style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {log.details || '-'}
                       </td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                      <td data-card-title="Date" style={{ color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>
                         {new Date(log.createdAt).toLocaleDateString()} {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </td>
                     </tr>

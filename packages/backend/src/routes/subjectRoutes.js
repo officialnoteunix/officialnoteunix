@@ -6,6 +6,7 @@ import { escapeRegex } from '../utils/escapeRegex.js';
 import { safeLimit, safePage } from '../utils/constants.js';
 import { validate } from '../middleware/validate.js';
 import { createContentSchema, updateContentSchema } from '../validators/adminValidator.js';
+import { cascadeDeleteSubject } from '../utils/cascadeDelete.js';
 
 const router = Router();
 
@@ -36,10 +37,11 @@ router.get('/:id', async (req, res, next) => {
 
 router.get('/:id/notes', async (req, res, next) => {
   try {
-    const { page = 1, limit = 5 } = req.query;
+    const { page = 1, limit = 5, resourceType } = req.query;
     const safeLim = safeLimit(limit);
     const safePg = safePage(page);
     const query = { subjectId: req.params.id, approved: true };
+    if (resourceType) query.resourceType = resourceType;
     const skip = (safePg - 1) * safeLim;
     const [notes, total] = await Promise.all([
       Note.find(query)
@@ -70,8 +72,10 @@ router.patch('/:id', authenticate, authorize('admin'), validate(updateContentSch
 
 router.delete('/:id', authenticate, authorize('admin'), async (req, res, next) => {
   try {
-    await Subject.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: 'Deleted' });
+    const subject = await Subject.findById(req.params.id);
+    if (!subject) return res.status(404).json({ success: false, message: 'Not found' });
+    const result = await cascadeDeleteSubject(Subject, req.params.id);
+    res.json({ success: true, message: 'Deleted', data: result });
   } catch (err) { next(err); }
 });
 

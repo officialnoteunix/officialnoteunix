@@ -4,7 +4,9 @@ import { useToast } from '../../context/ToastContext';
 import { emitStatsRefresh } from '../../utils/statsRefresh';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import DetailModal from '../../components/ui/DetailModal';
+import Modal from '../../components/ui/Modal';
 import Pagination from '../../components/ui/Pagination';
+import Select from '../../components/ui/Select';
 import type { Ad } from '../../types';
 import { Megaphone, Plus, Edit2, Trash2, Eye, MousePointer, Check, ChevronLeft, Calendar, Image as ImageIcon, Link, AlignLeft, ToggleLeft, Filter } from 'lucide-react';
 import { getApiError } from '../../utils/constants';
@@ -164,21 +166,11 @@ export default function AdminAds() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-subtle)', borderRadius: 10, padding: '0 12px', border: '1.5px solid var(--border-color)' }}>
-          <Filter size={14} style={{ color: 'var(--text-light)', flexShrink: 0 }} />
-          <select value={filterSlot} onChange={e => setFilterSlot(e.target.value)}
-            style={{ border: 'none', background: 'transparent', padding: '8px 0', fontSize: 13, color: 'var(--text-main)', outline: 'none' }}>
-            <option value="all">All Slots</option>
-            {slots.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
+        <div style={{ maxWidth: 160 }}>
+          <Select value={filterSlot} onChange={val => setFilterSlot(val)} options={[{ value: 'all', label: 'All Slots' }, ...slots.map(s => ({ value: s.key, label: s.label }))]} icon={<Filter size={14} />} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-subtle)', borderRadius: 10, padding: '0 12px', border: '1.5px solid var(--border-color)' }}>
-          <select value={filterActive} onChange={e => setFilterActive(e.target.value)}
-            style={{ border: 'none', background: 'transparent', padding: '8px 0', fontSize: 13, color: 'var(--text-main)', outline: 'none' }}>
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+        <div style={{ maxWidth: 160 }}>
+          <Select value={filterActive} onChange={val => setFilterActive(val)} options={[{ value: 'all', label: 'All Status' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} />
         </div>
         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{filtered.length} of {ads.length} ads</span>
       </div>
@@ -264,12 +256,7 @@ export default function AdminAds() {
           <div className="grid-2" style={{ marginBottom: 20 }}>
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 7 }}>Slot <span style={{ color: 'var(--danger)' }}>*</span></label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', borderRadius: 10, border: '1.5px solid var(--border-color)', background: 'var(--bg-subtle)' }}>
-                <Megaphone size={15} style={{ color: 'var(--text-light)', flexShrink: 0 }} />
-                <select className="form-select" value={formSlot} onChange={e => setFormSlot(e.target.value)} required style={{ border: 'none', background: 'transparent', padding: '11px 0', width: '100%', fontSize: 13.5 }}>
-                  {slots.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                </select>
-              </div>
+              <Select value={formSlot} onChange={val => setFormSlot(val)} options={slots.map(s => ({ value: s.key, label: s.label }))} icon={<Megaphone size={15} />} />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 7 }}>Active</label>

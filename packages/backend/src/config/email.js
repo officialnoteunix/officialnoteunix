@@ -26,8 +26,23 @@ function getTransporter() {
   return _transporter;
 }
 
+let _emailEnabled = null;
+
 export function isEmailEnabled() {
-  return !!createTransporter();
+  if (_emailEnabled !== null) return _emailEnabled;
+  _emailEnabled = !!(process.env.SMTP_HOST && process.env.SMTP_USER);
+  return _emailEnabled;
+}
+
+export function getEmailRetryInfo() {
+  const now = new Date();
+  const pacificStr = now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
+  const pacificDate = new Date(pacificStr);
+  const midnightPacific = new Date(pacificDate);
+  midnightPacific.setHours(24, 0, 0, 0);
+  const diffMs = midnightPacific.getTime() - now.getTime();
+  const hours = Math.ceil(diffMs / (1000 * 60 * 60));
+  return { hours: Math.max(1, hours), resetsAt: midnightPacific.toISOString() };
 }
 
 export async function verifySmtp() {
@@ -51,9 +66,18 @@ async function sendMail(options) {
   const t = getTransporter();
   if (!t) {
     console.warn(`[EMAIL] Skipped "${options.subject}" — SMTP not configured`);
-    return;
+    return { success: false, reason: 'not_configured' };
   }
-  await t.sendMail(options);
+  try {
+    const info = await t.sendMail(options);
+    console.log(`[EMAIL] Sent "${options.subject}" to ${options.to} — ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[EMAIL] Failed to send "${options.subject}" to ${options.to}:`, err.message);
+    if (err.response) console.error(`[EMAIL] SMTP response:`, err.response);
+    const retry = getEmailRetryInfo();
+    return { success: false, reason: err.message, retryHours: retry.hours };
+  }
 }
 
 const SITE_URL = process.env.CORS_ORIGIN || 'http://localhost:5173';
@@ -63,23 +87,26 @@ function wrapTemplate(title, bodyHtml) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;padding:48px 16px;">
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:40px 0;">
     <tr><td align="center">
-      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;">
-        <tr><td style="padding-bottom:32px;text-align:center;">
-          <span style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:700;color:#0f172a;letter-spacing:-0.5px;">${SITE_NAME}</span>
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+        <tr><td style="padding-bottom:24px;text-align:center;">
+          <span style="font-size:22px;font-weight:800;color:#1a1a2e;letter-spacing:-0.5px;">${SITE_NAME}</span>
         </td></tr>
-        <tr><td style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+        <tr><td style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
           <table width="100%" cellpadding="0" cellspacing="0">
-            <tr><td style="padding:36px 40px 32px;">
-              <h2 style="margin:0 0 20px;color:#0f172a;font-size:19px;font-weight:700;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;letter-spacing:-0.3px;">${title}</h2>
+            <tr><td style="padding:40px 48px 36px;">
+              <h1 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;font-weight:700;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">${title}</h1>
               ${bodyHtml}
             </td></tr>
           </table>
         </td></tr>
-        <tr><td style="padding:28px 0 0;text-align:center;">
-          <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+        <tr><td style="padding:24px 0 0;text-align:center;">
+          <p style="margin:0 0 4px;color:#999;font-size:12px;line-height:1.6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+            ${SITE_NAME} &mdash; Share knowledge, empower learning.
+          </p>
+          <p style="margin:0;color:#bbb;font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
             &copy; ${new Date().getFullYear()} ${SITE_NAME}. All rights reserved.
           </p>
         </td></tr>
@@ -91,93 +118,114 @@ function wrapTemplate(title, bodyHtml) {
 }
 
 export async function sendVerificationEmail(email, verifyUrl, fullname) {
-  await sendMail({
-    from: process.env.SMTP_FROM || `NoteUniX <${process.env.SMTP_USER}>`,
+  return await sendMail({
+    from: process.env.SMTP_FROM || `${SITE_NAME} <${process.env.SMTP_USER}>`,
     to: email,
-    subject: `Verify your email — ${SITE_NAME}`,
-    html: wrapTemplate('Verify Your Email', `
-      <p style="margin:0 0 12px;color:#334155;font-size:14px;line-height:1.7;">Hi ${fullname},</p>
-      <p style="margin:0 0 20px;color:#334155;font-size:14px;line-height:1.7;">Thanks for creating your ${SITE_NAME} account. Please confirm your email address to get started.</p>
-      <a href="${verifyUrl}" style="display:inline-block;background-color:#6366f1;color:#ffffff;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;text-decoration:none;margin-bottom:20px;">Verify Email Address</a>
-      <p style="margin:12px 0 0;color:#64748b;font-size:13px;line-height:1.6;">This link expires in 1 hour. If you didn't create an account, you can safely ignore this email.</p>
+    subject: `Verify your email address — ${SITE_NAME}`,
+    html: wrapTemplate('Verify your email address', `
+      <p style="margin:0 0 16px;color:#555;font-size:14px;line-height:1.7;">Hi ${fullname},</p>
+      <p style="margin:0 0 20px;color:#555;font-size:14px;line-height:1.7;">Thanks for signing up for ${SITE_NAME}. Please confirm your email address by clicking the button below.</p>
+      <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+        <tr><td style="background-color:#6366f1;border-radius:6px;">
+          <a href="${verifyUrl}" style="display:inline-block;padding:12px 28px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Verify Email Address</a>
+        </td></tr>
+      </table>
+      <p style="margin:0 0 8px;color:#999;font-size:12px;line-height:1.6;">This link expires in 1 hour. If you didn't create an account, you can safely ignore this email.</p>
     `),
   });
 }
 
 export async function sendWelcomeEmail(email, fullname) {
-  await sendMail({
-    from: process.env.SMTP_FROM || `NoteUniX <${process.env.SMTP_USER}>`,
+  return await sendMail({
+    from: process.env.SMTP_FROM || `${SITE_NAME} <${process.env.SMTP_USER}>`,
     to: email,
     subject: `Welcome to ${SITE_NAME}!`,
-    html: wrapTemplate('Welcome Aboard!', `
-      <p style="margin:0 0 12px;color:#334155;font-size:14px;line-height:1.7;">Hi ${fullname},</p>
-      <p style="margin:0 0 12px;color:#334155;font-size:14px;line-height:1.7;">Your account is all set. You can now browse, upload, and share study notes with your university community.</p>
-      <a href="${SITE_URL}" style="display:inline-block;background-color:#6366f1;color:#ffffff;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;text-decoration:none;margin-bottom:20px;">Go to ${SITE_NAME}</a>
-      <p style="margin:12px 0 0;color:#64748b;font-size:13px;line-height:1.6;">If you have any questions, just reply to this email — we're happy to help.</p>
+    html: wrapTemplate('Welcome to NoteUniX!', `
+      <p style="margin:0 0 16px;color:#555;font-size:14px;line-height:1.7;">Hi ${fullname},</p>
+      <p style="margin:0 0 20px;color:#555;font-size:14px;line-height:1.7;">Your account is verified and ready to go. Here's how to get the most out of ${SITE_NAME}:</p>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+        <tr><td style="padding:12px 16px;background-color:#f8f9fa;border-radius:6px;margin-bottom:8px;">
+          <strong style="color:#1a1a2e;font-size:13px;">1. Browse Notes</strong>
+          <p style="margin:4px 0 0;color:#666;font-size:13px;line-height:1.5;">Explore study notes shared by students from universities worldwide. Use filters to find exactly what you need.</p>
+        </td></tr>
+      </table>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+        <tr><td style="padding:12px 16px;background-color:#f8f9fa;border-radius:6px;">
+          <strong style="color:#1a1a2e;font-size:13px;">2. Upload & Share</strong>
+          <p style="margin:4px 0 0;color:#666;font-size:13px;line-height:1.5;">Upload your own notes (PDF, DOC, PPT, images) to help other students. Earn reputation points with every contribution.</p>
+        </td></tr>
+      </table>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+        <tr><td style="padding:12px 16px;background-color:#f8f9fa;border-radius:6px;">
+          <strong style="color:#1a1a2e;font-size:13px;">3. Rate & Comment</strong>
+          <p style="margin:4px 0 0;color:#666;font-size:13px;line-height:1.5;">Help the community by rating notes and leaving feedback. The best content rises to the top.</p>
+        </td></tr>
+      </table>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+        <tr><td style="padding:12px 16px;background-color:#f8f9fa;border-radius:6px;">
+          <strong style="color:#1a1a2e;font-size:13px;">4. Climb the Leaderboard</strong>
+          <p style="margin:4px 0 0;color:#666;font-size:13px;line-height:1.5;">Earn points for uploading, rating, and engaging. Top contributors get recognized on the public leaderboard.</p>
+        </td></tr>
+      </table>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+        <tr><td style="padding:12px 16px;background-color:#f8f9fa;border-radius:6px;">
+          <strong style="color:#1a1a2e;font-size:13px;">5. Bookmark & Organize</strong>
+          <p style="margin:4px 0 0;color:#666;font-size:13px;line-height:1.5;">Save your favorite notes with bookmarks so you can quickly access them later.</p>
+        </td></tr>
+      </table>
+
+      <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+        <tr><td style="background-color:#6366f1;border-radius:6px;">
+          <a href="${SITE_URL}/notes" style="display:inline-block;padding:12px 28px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Start Exploring</a>
+        </td></tr>
+      </table>
+
+      <p style="margin:0 0 8px;color:#999;font-size:12px;line-height:1.6;">If you have any questions, visit our <a href="${SITE_URL}/support" style="color:#6366f1;text-decoration:none;">Help & FAQ page</a> or reply to this email.</p>
     `),
   });
 }
 
 export async function sendResetEmail(email, resetUrl) {
-  await sendMail({
-    from: process.env.SMTP_FROM || `NoteUniX <${process.env.SMTP_USER}>`,
+  return await sendMail({
+    from: process.env.SMTP_FROM || `${SITE_NAME} <${process.env.SMTP_USER}>`,
     to: email,
     subject: `Reset your password — ${SITE_NAME}`,
-    html: wrapTemplate('Password Reset', `
-      <p style="margin:0 0 12px;color:#334155;font-size:14px;line-height:1.7;">We received a request to reset the password for your ${SITE_NAME} account.</p>
-      <a href="${resetUrl}" style="display:inline-block;background-color:#6366f1;color:#ffffff;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;text-decoration:none;margin-bottom:20px;">Reset Password</a>
-      <p style="margin:12px 0 0;color:#64748b;font-size:13px;line-height:1.6;">This link expires in 1 hour. If you didn't request a password reset, you can safely ignore this email — your password will remain unchanged.</p>
+    html: wrapTemplate('Reset your password', `
+      <p style="margin:0 0 16px;color:#555;font-size:14px;line-height:1.7;">We received a request to reset the password on your ${SITE_NAME} account.</p>
+      <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+        <tr><td style="background-color:#6366f1;border-radius:6px;">
+          <a href="${resetUrl}" style="display:inline-block;padding:12px 28px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Reset Password</a>
+        </td></tr>
+      </table>
+      <p style="margin:0 0 8px;color:#999;font-size:12px;line-height:1.6;">This link expires in 1 hour. If you didn't request a password reset, you can safely ignore this email — your password will remain unchanged.</p>
     `),
   });
 }
 
 export async function sendPasswordChangedEmail(email) {
-  await sendMail({
-    from: process.env.SMTP_FROM || `NoteUniX <${process.env.SMTP_USER}>`,
+  return await sendMail({
+    from: process.env.SMTP_FROM || `${SITE_NAME} <${process.env.SMTP_USER}>`,
     to: email,
     subject: `Password changed — ${SITE_NAME}`,
-    html: wrapTemplate('Password Updated', `
-      <p style="margin:0 0 12px;color:#334155;font-size:14px;line-height:1.7;">Your ${SITE_NAME} password was successfully changed.</p>
-      <p style="margin:0 0;color:#64748b;font-size:13px;line-height:1.6;">If you didn't make this change, please contact our support team immediately.</p>
-    `),
-  });
-}
-
-export async function sendNoteApprovedEmail(email, noteTitle, noteUrl) {
-  await sendMail({
-    from: process.env.SMTP_FROM || `NoteUniX <${process.env.SMTP_USER}>`,
-    to: email,
-    subject: `Your note is live — ${SITE_NAME}`,
-    html: wrapTemplate('Note Approved', `
-      <p style="margin:0 0 12px;color:#334155;font-size:14px;line-height:1.7;">Great news! Your note <strong>"${noteTitle}"</strong> has been approved and is now visible to everyone.</p>
-      <a href="${noteUrl}" style="display:inline-block;background-color:#6366f1;color:#ffffff;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;text-decoration:none;margin-bottom:20px;">View Your Note</a>
-    `),
-  });
-}
-
-export async function sendContactReplyEmail(toEmail, toName, subject, replyBody) {
-  await sendMail({
-    from: process.env.SMTP_FROM || `NoteUniX <${process.env.SMTP_USER}>`,
-    to: toEmail,
-    subject: `Re: ${subject} — ${SITE_NAME}`,
-    html: wrapTemplate('Reply from NoteUniX', `
-      <p style="margin:0 0 12px;color:#334155;font-size:14px;line-height:1.7;">Hi ${toName},</p>
-      <p style="margin:0 0 16px;color:#334155;font-size:14px;line-height:1.7;">Thank you for reaching out. Here is our response:</p>
-      <div style="background-color:#f8fafc;border-left:3px solid #6366f1;padding:16px 20px;border-radius:0 8px 8px 0;margin-bottom:20px;">
-        <p style="margin:0;color:#334155;font-size:14px;line-height:1.7;white-space:pre-wrap;">${replyBody}</p>
-      </div>
-      <p style="margin:0 0;color:#64748b;font-size:13px;line-height:1.6;">If you have further questions, feel free to reach out again.</p>
+    html: wrapTemplate('Password updated', `
+      <p style="margin:0 0 16px;color:#555;font-size:14px;line-height:1.7;">Your ${SITE_NAME} password was successfully changed.</p>
+      <p style="margin:0 0 8px;color:#999;font-size:12px;line-height:1.6;">If you didn't make this change, please contact our support team immediately.</p>
     `),
   });
 }
 
 export async function sendCustomEmail({ to, subject, html, from }) {
-  await sendMail({
-    from: from || process.env.SMTP_FROM || `NoteUniX <${process.env.SMTP_USER}>`,
+  return await sendMail({
+    from: from || process.env.SMTP_FROM || `${SITE_NAME} <${process.env.SMTP_USER}>`,
     to,
     subject,
     html: wrapTemplate(subject, `
-      <div style="font-size:14px;line-height:1.7;color:#334155;">${html}</div>
+      <div style="font-size:14px;line-height:1.7;color:#555;">${html}</div>
     `),
   });
 }

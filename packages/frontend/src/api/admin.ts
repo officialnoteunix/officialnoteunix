@@ -11,12 +11,15 @@ export const adminApi = {
     api.get<APIResponse<PaginatedData<Note>>>('/admin/notes', { params: { approved, page, limit } }),
   createNote: (formData: FormData) =>
     api.post<APIResponse<Note>>('/admin/notes', formData),
+  updateNote: (id: string, data: Record<string, any> | FormData) => api.patch(`/admin/notes/${id}`, data),
   approveNote: (id: string) =>
     api.patch<APIResponse<Note>>(`/admin/notes/${id}/approve`),
   deleteNote: (id: string) =>
     api.delete<APIResponse<void>>(`/admin/notes/${id}`),
   toggleBan: (id: string) =>
     api.patch<APIResponse<User>>(`/admin/users/${id}/ban`),
+  toggleVerify: (id: string) =>
+    api.patch<APIResponse<User>>(`/admin/users/${id}/verify`),
   suspendUser: (id: string, durationHours: number) =>
     api.patch<APIResponse<User>>(`/admin/users/${id}/suspend`, { durationHours }),
   deleteUser: (id: string) =>
@@ -26,7 +29,7 @@ export const adminApi = {
   markContactRead: (id: string) => api.patch<APIResponse<any>>(`/contact/${id}/read`),
   markAllContactRead: () => api.patch<APIResponse<void>>('/contact/read-all'),
   deleteContact: (id: string) => api.delete<APIResponse<void>>(`/contact/${id}`),
-  comments: (page = 1, limit = 10) =>
+  comments: (page = 1, limit = 5) =>
     api.get<APIResponse<PaginatedData<any>>>('/admin/comments', { params: { page, limit } }),
   deleteComment: (id: string) => api.delete<APIResponse<void>>(`/admin/comments/${id}`),
   auditLogs: (page = 1, limit = 30) =>

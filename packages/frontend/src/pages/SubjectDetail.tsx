@@ -5,6 +5,7 @@ import { ArrowLeft, BookOpen, ChevronRight, FileText } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { getApiError } from '../utils/constants';
 import { getThumbnailUrl } from '../utils/cloudinary';
+import FileTypePlaceholder from '../components/ui/FileTypePlaceholder';
 
 const cardPalette = [
   { bg: 'var(--palette-0-bg)', color: 'var(--palette-0)' },
@@ -44,12 +45,19 @@ export default function SubjectDetail() {
   const uni = subject.semesterId?.courseId?.universityId;
 
   return (
-    <div style={{ padding: '100px 5% 60px', maxWidth: 1000, margin: '0 auto' }}>
-      <Link to={`/semesters/${subject.semesterId?._id}`} style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>
+    <div className="detail-page" style={{ padding: '100px 5% 60px', maxWidth: 1000, margin: '0 auto' }}>
+      <div className="mobile-breadcrumb">
+        <Link to={`/semesters/${subject.semesterId?._id}`} className="mobile-breadcrumb-back"><ArrowLeft size={14} /></Link>
+        <span className="mobile-breadcrumb-text">{subject.semesterId?.title}</span>
+        <span className="mobile-breadcrumb-sep">/</span>
+        <span className="mobile-breadcrumb-current">{subject.name}</span>
+      </div>
+      <Link to={`/semesters/${subject.semesterId?._id}`} className="hide-mobile-breadcrumb"
+        style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>
         <ArrowLeft size={16} /> {subject.semesterId?.title}
       </Link>
 
-      <div className="detail-grid" style={{ gridTemplateColumns: '1fr 420px' }}>
+      <div className="detail-grid detail-grid-sidebar">
         <div>
           <div className="hierarchy-card" style={{ borderLeftColor: 'var(--palette-4)', cursor: 'default' }}>
             <span className="hierarchy-card-badge" style={{ background: 'var(--palette-4-bg)', color: 'var(--palette-4)' }}>
@@ -84,27 +92,34 @@ export default function SubjectDetail() {
           </div>
 
           {notes.length > 0 && (
-            <div className="hierarchy-card" style={{ borderLeftColor: 'var(--palette-1)', cursor: 'default', marginTop: 16 }}>
+            <div className="hierarchy-card" style={{ borderLeftColor: 'var(--palette-1)', cursor: 'default' }}>
               <span className="hierarchy-card-badge" style={{ background: 'var(--palette-1-bg)', color: 'var(--palette-1)' }}>
                 <FileText size={11} style={{ marginRight: 4 }} /> Notes ({notesTotal})
               </span>
-              <div className="hierarchy-grid" style={{ marginTop: 12, gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              <div className="hierarchy-grid notes-grid" style={{ marginTop: 12 }}>
                 {notes.map((note, i) => {
                   const c = cardPalette[i % cardPalette.length];
-                  const thumbUrl = getThumbnailUrl(note.cloudinaryUrl);
+                  const ft = note.files?.[0]?.fileType || note.fileType;
+                  const thumbUrl = getThumbnailUrl(note.files?.[0]?.url || note.cloudinaryUrl, ft, note.thumbnailUrl);
                   return (
                   <Link key={note._id} to={`/notes/${note._id}`} className="hierarchy-card"
                     style={{ borderLeftColor: c.color, textDecoration: 'none', color: 'inherit', minHeight: 140 }}>
                     <div style={{ display: 'flex', gap: 16, height: '100%' }}>
+                      {thumbUrl ? (
                       <div style={{
                         width: 100, borderRadius: 'var(--radius-sm)', flexShrink: 0,
                         backgroundImage: `url(${thumbUrl})`,
                         backgroundSize: 'cover', backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat', backgroundColor: c.color,
+                        backgroundRepeat: 'no-repeat',
                       }} />
-                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '2px 0' }}>
-                        <span className="hierarchy-card-badge" style={{ background: c.bg, color: c.color }}>
-                          PDF · {note.fileSize ? `${(note.fileSize / 1024 / 1024).toFixed(1)} MB` : ''}
+                      ) : (
+                      <div style={{ width: 100, borderRadius: 'var(--radius-sm)', overflow: 'hidden', flexShrink: 0, background: 'var(--bg-subtle)' }}>
+                        <FileTypePlaceholder fileType={ft} height={140} />
+                      </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '4px 0' }}>
+                        <span className="hierarchy-card-badge" style={{ color: c.color }}>
+                          {note.fileType?.toUpperCase() || 'PDF'}
                         </span>
                         <div className="hierarchy-card-title" style={{ marginTop: 4 }}>{note.title}</div>
                         <div className="hierarchy-card-sub" style={{ marginTop: 2, flex: 1 }}>
@@ -113,7 +128,7 @@ export default function SubjectDetail() {
                         <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-light)', display: 'flex', gap: 6, alignItems: 'center' }}>
                           <span>by {note.userId?.fullname || 'Unknown'}</span>
                           <span>·</span>
-                          <span>{note.downloads || 0} downloads</span>
+                          <span style={{ textTransform: 'capitalize' }}>{(note.resourceType || 'study_notes').replace(/_/g, ' ')}</span>
                         </div>
                       </div>
                     </div>
@@ -160,7 +175,6 @@ export default function SubjectDetail() {
               <Link to={`/semesters/${subject.semesterId?._id}`} style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>← {subject.semesterId?.title}</Link>
             </div>
           </div>
-
         </div>
       </div>
     </div>

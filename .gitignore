@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+build/
 .turbo/
 *.tsbuildinfo
 
@@ -35,6 +36,8 @@ uploads/*
 
 # Internal docs
 docs/
+TESTING_GUIDE.md
+REVENUE.md
 
 # Run scripts (replaced by dev.bat / backend.bat / frontend.bat)
 run.cmd
@@ -42,5 +45,8 @@ run.ps1
 start_backend.bat
 start_frontend.bat
 
-# Internal docs
-TESTING_GUIDE.md
+# Test coverage
+coverage/
+
+# ESLint cache
+.eslintcache

@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import Report from '../models/Report.js';
-import AuditLog from '../models/AuditLog.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { safeLimit, safePage } from '../utils/constants.js';
+import { logAudit } from '../services/auditLogger.js';
 
 const router = Router();
 
@@ -79,7 +79,7 @@ router.patch('/:id/status', authenticate, authorize('admin'), async (req, res, n
     }
     const report = await Report.findByIdAndUpdate(req.params.id, { status }, { new: true }).populate('note', 'title');
     if (!report) return res.status(404).json({ success: false, message: 'Not found' });
-    await AuditLog.create({
+    await logAudit({
       adminId: req.user._id, adminEmail: req.user.email,
       action: status === 'resolved' ? 'report_resolve' : 'report_dismiss',
       targetType: 'report', targetId: report._id,

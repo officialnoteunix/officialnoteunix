@@ -1,10 +1,31 @@
-export function getThumbnailUrl(cloudinaryUrl: string | undefined): string | undefined {
-  if (!cloudinaryUrl) return undefined;
-  const isImagePath = cloudinaryUrl.includes('/image/upload/');
-  const isRawPath = cloudinaryUrl.includes('/raw/upload/');
-  if (!isImagePath && !isRawPath) return cloudinaryUrl;
-  if (isRawPath || !cloudinaryUrl.endsWith('.pdf')) return cloudinaryUrl;
-  return cloudinaryUrl
-    .replace('/image/upload/', '/image/upload/w_120,h_140,c_fill/')
-    .replace('.pdf', '.jpg');
+const officeExts = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.rtf', '.odt', '.ods', '.odp'];
+
+export const officeTypes = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'odt', 'ods', 'odp']);
+
+export function isOfficeFile(fileType?: string): boolean {
+  return fileType ? officeTypes.has(fileType.toLowerCase()) : false;
+}
+
+export function getThumbnailUrl(url: string | undefined, fileType?: string, thumbnailUrl?: string): string | undefined {
+  if (thumbnailUrl) {
+    return thumbnailUrl.replace('/upload/', '/upload/w_120,h_140,c_fill/');
+  }
+  if (!url) return undefined;
+  if (officeExts.some(ext => url.toLowerCase().endsWith(ext))) {
+    const base = url.includes('/raw/upload/')
+      ? url.replace('/raw/upload/', '/image/upload/w_120,h_140,c_fill,f_pdf,pg_1/')
+      : url.replace('/image/upload/', '/image/upload/w_120,h_140,c_fill,f_pdf,pg_1/');
+    return base.replace(/\.\w+$/, '.jpg');
+  }
+  const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  if (imageExts.some(ext => url.endsWith(ext))) {
+    return url.replace('/upload/', '/upload/w_120,h_140,c_fill/');
+  }
+  if (url.endsWith('.pdf') || fileType === 'pdf') {
+    const base = url.includes('/raw/upload/')
+      ? url.replace('/raw/upload/', '/image/upload/w_120,h_140,c_fill/')
+      : url.replace('/image/upload/', '/image/upload/w_120,h_140,c_fill/');
+    return base.replace('.pdf', '.jpg');
+  }
+  return undefined;
 }

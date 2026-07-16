@@ -4,7 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import { emitStatsRefresh } from '../../utils/statsRefresh';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import DetailModal from '../../components/ui/DetailModal';
-import { MessageSquare, Mail, User, Trash2, CheckCheck, Clock, Inbox, Send, Reply } from 'lucide-react';
+import { MessageSquare, Mail, User, Trash2, CheckCheck, Clock, Inbox, Send, Reply, AlertTriangle } from 'lucide-react';
 import { getApiError } from '../../utils/constants';
 
 interface ContactMessage {
@@ -29,6 +29,7 @@ export default function Messages() {
   const [replyTarget, setReplyTarget] = useState<ContactMessage | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
+  const [retryHours, setRetryHours] = useState<number | null>(null);
 
   const fetchMessages = useCallback(() => {
     setLoading(true);
@@ -72,8 +73,15 @@ export default function Messages() {
       setMessages(prev => prev.map(m => m._id === replyTarget._id ? { ...m, replied: true, replyContent: replyText.trim(), repliedAt: res.data.data.repliedAt, read: true } : m));
       setReplyTarget(null);
       setReplyText('');
-    } catch (err) {
-      showToast('error', getApiError(err, 'Failed to send reply'));
+      setRetryHours(null);
+    } catch (err: any) {
+      const rh = err?.response?.data?.retryHours;
+      if (rh) {
+        setRetryHours(rh);
+        showToast('error', `Email service unavailable. Please try again in ~${rh}h.`, 8000);
+      } else {
+        showToast('error', getApiError(err, 'Failed to send reply'));
+      }
     } finally {
       setReplyLoading(false);
     }
@@ -100,6 +108,23 @@ export default function Messages() {
         </div>
       </div>
 
+      {retryHours !== null && (
+        <div style={{
+          marginBottom: 20, padding: '12px 16px', borderRadius: 'var(--radius-md)',
+          background: 'var(--warning-light, rgba(245,158,11,0.1))', border: '1px solid var(--warning, #f59e0b)',
+          display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-main)',
+        }}>
+          <AlertTriangle size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+          <div>
+            <strong>Email service temporarily unavailable.</strong>{' '}
+            <span style={{ color: 'var(--text-muted)' }}>
+              Replies are saved but emails won't send. Resets in ~{retryHours}h.
+            </span>
+          </div>
+          <Clock size={14} style={{ color: 'var(--warning)', flexShrink: 0, marginLeft: 'auto' }} />
+        </div>
+      )}
+
       {messages.length === 0 ? (
         <div className="empty-state"><Inbox size={48} /><h3>No messages yet</h3></div>
       ) : (
@@ -122,7 +147,7 @@ export default function Messages() {
                   onClick={() => setDetailTarget(msg)}
                   style={{ opacity: msg.read && msg.replied ? 0.6 : 1 }}
                 >
-                  <td>
+                  <td data-card-title="Status">
                     {msg.replied ? (
                       <span className="badge badge-secondary" style={{ fontSize: 10 }}>
                         <Reply size={11} style={{ marginRight: 3 }} /> Replied
@@ -137,34 +162,34 @@ export default function Messages() {
                       </span>
                     )}
                   </td>
-                  <td>
+                  <td data-card-title="From">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div className="user-avatar" style={{ width: 28, height: 28, fontSize: 11 }}>{msg.name.charAt(0).toUpperCase()}</div>
-                      <div>
+                      <div className="user-avatar" style={{ width: 28, height: 28, fontSize: 11, flexShrink: 0 }}>{msg.name.charAt(0).toUpperCase()}</div>
+                      <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{msg.name}</div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{msg.email}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: 11, wordBreak: 'break-all' }}>{msg.email}</div>
                       </div>
                     </div>
                   </td>
-                  <td style={{ fontSize: 13 }}>{msg.topic || '—'}</td>
-                  <td style={{ fontSize: 13, maxWidth: 280 }}>
-                    <div className="msg-truncate">{msg.message}</div>
+                  <td data-card-title="Topic" style={{ fontSize: 13, wordBreak: 'break-word' }}>{msg.topic || '—'}</td>
+                  <td data-card-title="Message" style={{ fontSize: 13 }}>
+                    <div style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}>{msg.message}</div>
                   </td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                  <td data-card-title="Date" style={{ color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>
                     <Clock size={11} style={{ marginRight: 3, verticalAlign: 'middle' }} />
                     {new Date(msg.createdAt).toLocaleDateString()}
                   </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
-                      <button onClick={() => openReply(msg)} className="btn-rounded" style={{ padding: '5px 10px', fontSize: 10, backgroundColor: 'var(--primary-light)', color: 'var(--primary)', border: 'none', cursor: 'pointer' }}>
+                  <td data-card-title="Actions">
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => openReply(msg)} className="btn-rounded" style={{ padding: '5px 10px', fontSize: 10, backgroundColor: 'var(--primary-light)', color: 'var(--primary)', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
                         <Reply size={11} /> Reply
                       </button>
                       {!msg.read && (
-                        <button onClick={() => handleMarkRead(msg)} className="btn-rounded" style={{ padding: '5px 10px', fontSize: 10, backgroundColor: 'var(--primary-light)', color: 'var(--primary)', border: 'none', cursor: 'pointer' }}>
+                        <button onClick={() => handleMarkRead(msg)} className="btn-rounded" style={{ padding: '5px 10px', fontSize: 10, backgroundColor: 'var(--primary-light)', color: 'var(--primary)', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
                           <CheckCheck size={11} /> Read
                         </button>
                       )}
-                      <button onClick={() => setDeleteTarget(msg)} className="btn-rounded" style={{ padding: '5px 10px', fontSize: 10, backgroundColor: 'var(--danger-light)', color: 'var(--danger)', border: 'none', cursor: 'pointer' }}>
+                      <button onClick={() => setDeleteTarget(msg)} className="btn-rounded" style={{ padding: '5px 10px', fontSize: 10, backgroundColor: 'var(--danger-light)', color: 'var(--danger)', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
                         <Trash2 size={11} /> Delete
                       </button>
                     </div>
@@ -263,9 +288,9 @@ export default function Messages() {
               <button onClick={() => { setReplyTarget(null); setReplyText(''); }} className="btn-rounded" style={{ padding: '9px 20px', fontSize: 13, background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border-color)' }}>
                 Cancel
               </button>
-              <button onClick={handleReply} disabled={!replyText.trim() || replyLoading} className="btn-rounded btn-primary" style={{ padding: '9px 20px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, opacity: (!replyText.trim() || replyLoading) ? 0.5 : 1 }}>
+              <button onClick={handleReply} disabled={!replyText.trim() || replyLoading || retryHours !== null} className="btn-rounded btn-primary" style={{ padding: '9px 20px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, opacity: (!replyText.trim() || replyLoading || retryHours !== null) ? 0.5 : 1 }}>
                 {replyLoading ? <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> : <Send size={13} />}
-                {replyLoading ? 'Sending...' : 'Send Reply'}
+                {replyLoading ? 'Sending...' : retryHours !== null ? `Unavailable (~${retryHours}h)` : 'Send Reply'}
               </button>
             </div>
           </div>

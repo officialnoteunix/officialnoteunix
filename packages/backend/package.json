@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development node --watch src/server.js",
     "start": "cross-env NODE_ENV=production node src/server.js",
+    "seed": "node src/scripts/seed.js",
     "test": "node --test src/tests/*.test.js",
     "lint": "eslint src/",
     "format": "prettier --write src/"

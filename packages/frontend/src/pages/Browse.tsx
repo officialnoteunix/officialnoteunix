@@ -6,12 +6,29 @@ import { semesterApi } from '../api/semester';
 import { subjectApi } from '../api/subject';
 import { noteApi } from '../api/note';
 import { getThumbnailUrl } from '../utils/cloudinary';
-import { Search, FileText, Building, ArrowLeft, ExternalLink, Star } from 'lucide-react';
+import FileTypePlaceholder from '../components/ui/FileTypePlaceholder';
+import { Search, FileText, Building, ArrowLeft, ExternalLink, Star, Filter, Upload, BadgeCheck } from 'lucide-react';
+import Select from '../components/ui/Select';
 import Pagination from '../components/ui/Pagination';
 import StarRating from '../components/ui/StarRating';
 import { useToast } from '../context/ToastContext';
 import { getApiError } from '../utils/constants';
 import SEO from '../components/seo/SEO';
+
+const RESOURCE_TYPES = [
+  { value: '', label: 'All Types' },
+  { value: 'study_notes', label: 'Study Notes' },
+  { value: 'past_question', label: 'Past Question' },
+  { value: 'assignment', label: 'Assignment' },
+  { value: 'lab_report', label: 'Lab Report' },
+  { value: 'practical_file', label: 'Practical File' },
+  { value: 'reference_book', label: 'Reference Book' },
+  { value: 'syllabus', label: 'Syllabus' },
+  { value: 'study_guide', label: 'Study Guide' },
+  { value: 'important_question', label: 'Important Question' },
+  { value: 'mcq', label: 'MCQ' },
+  { value: 'department_resource', label: 'Department Resource' },
+];
 
 type HierarchyItem = { type: 'university' | 'course' | 'semester' | 'subject'; id: string; name: string };
 
@@ -32,10 +49,21 @@ export default function Browse() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [resourceTypeFilter, setResourceTypeFilter] = useState('');
   const restoring = useRef(true);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [search]);
 
   const level: Level = hierarchy.length === 0 ? 'universities'
     : hierarchy.length === 1 ? 'courses'
@@ -50,7 +78,7 @@ export default function Browse() {
       let tp = 1, tt = 0;
       switch (level) {
         case 'universities': {
-          const res = await universityApi.list(search || undefined);
+          const res = await universityApi.list(debouncedSearch || undefined);
           data = res.data.data; break;
         }
         case 'courses': {
@@ -66,7 +94,7 @@ export default function Browse() {
           data = res.data.data; break;
         }
         case 'notes': {
-          const res = await noteApi.list({ page: p, limit: 5, subjectId: hierarchy[3].id });
+          const res = await noteApi.list({ page: p, limit: 9, subjectId: hierarchy[3].id, resourceType: resourceTypeFilter || undefined });
           data = res.data.data.items; tp = res.data.data.totalPages; tt = res.data.data.total;
           break;
         }
@@ -78,7 +106,7 @@ export default function Browse() {
     } finally {
       setLoading(false);
     }
-  }, [hierarchy, level, search]);
+  }, [hierarchy, level, debouncedSearch, resourceTypeFilter]);
 
   useEffect(() => {
     restoring.current = false;
@@ -165,14 +193,7 @@ export default function Browse() {
     : level === 'subjects' ? 'Subjects'
     : 'Notes';
 
-  const cardPalette = [
-    { bg: 'var(--palette-0-bg)', color: 'var(--palette-0)' },
-    { bg: 'var(--palette-1-bg)', color: 'var(--palette-1)' },
-    { bg: 'var(--palette-2-bg)', color: 'var(--palette-2)' },
-    { bg: 'var(--palette-3-bg)', color: 'var(--palette-3)' },
-    { bg: 'var(--palette-4-bg)', color: 'var(--palette-4)' },
-    { bg: 'var(--palette-5-bg)', color: 'var(--palette-5)' },
-  ];
+  const accentColor = { bg: 'var(--primary-light)', color: 'var(--primary)' };
 
   const singular = level === 'universities' ? 'University'
     : level === 'courses' ? 'Course'
@@ -181,36 +202,46 @@ export default function Browse() {
     : 'Note';
 
   return (
-    <div style={{ padding: '100px 5% 60px', maxWidth: 1200, margin: '0 auto' }}>
+    <div className="browse-page">
       <SEO title="Browse Notes" description="Browse and search study notes organized by university, course, semester, and subject." />
-      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 16 }}>Browse Notes</h1>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+      <h1 className="browse-page-title">Browse Notes</h1>
+      <div className="browse-toolbar">
+        <div className="breadcrumb-row">
           {hierarchy.length > 0 && (
             <button onClick={goBack} className="btn-rounded btn-ghost" style={{ padding: '8px 12px', flexShrink: 0, fontSize: 12, marginRight: 4 }}>
               <ArrowLeft size={14} />
             </button>
           )}
-          <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer', color: hierarchy.length === 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: hierarchy.length === 0 ? 700 : 400, padding: 0, fontSize: 13 }}>
-            All {levelLabel}
-          </button>
-          {hierarchy.map((item, i) => (
-            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>
-              <span style={{ color: i === hierarchy.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === hierarchy.length - 1 ? 700 : 400 }}>
-                {item.name}
+          <div className="breadcrumb">
+            <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer', color: hierarchy.length === 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: hierarchy.length === 0 ? 700 : 400, padding: 0, fontSize: 13 }}>
+              All {levelLabel}
+            </button>
+            {hierarchy.map((item, i) => (
+              <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>
+                <span style={{ color: i === hierarchy.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === hierarchy.length - 1 ? 700 : 400 }}>
+                  {item.name}
+                </span>
               </span>
-            </span>
-          ))}
+            ))}
+          </div>
         </div>
-        <div className="search-bar" style={{ maxWidth: 360, marginLeft: 'auto' }}>
-          <Search size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          <input
-            type="text"
-            placeholder={`Search ${levelLabel.toLowerCase()}...`}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+        <div className="filter-search-row">
+          <Select
+            value={resourceTypeFilter}
+            onChange={(val) => { setResourceTypeFilter(val); setPage(1); }}
+            options={RESOURCE_TYPES}
+            icon={<Filter size={14} />}
           />
+          <div className="search-bar">
+            <Search size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder={`Search ${levelLabel.toLowerCase()}...`}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
@@ -222,38 +253,54 @@ export default function Browse() {
         <div className="empty-state">
           {level === 'notes' ? <FileText size={48} /> : <Building size={48} />}
           <h3>No {levelLabel.toLowerCase()} found</h3>
-          <p>{level === 'notes' ? 'No notes have been uploaded for this subject yet.' : `No ${levelLabel.toLowerCase()} match your search.`}</p>
+          {level === 'notes' ? (
+            <>
+              <p>No notes have been uploaded for this subject yet. Be the first to share!</p>
+              <Link to="/user/upload" className="btn-rounded btn-primary"
+                style={{ padding: '10px 24px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none', marginTop: 12 }}>
+                <Upload size={16} /> Upload a note
+              </Link>
+            </>
+          ) : (
+            <p>{`No ${levelLabel.toLowerCase()} match your search.`}</p>
+          )}
         </div>
       ) : level === 'notes' ? (
         <>
-          <div className="hierarchy-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="hierarchy-grid notes-grid">
             {items.map((note, i) => {
-              const c = cardPalette[i % cardPalette.length];
-              const thumbUrl = getThumbnailUrl(note.cloudinaryUrl);
+              const c = accentColor;
+              const ft = note.files?.[0]?.fileType || note.fileType;
+              const thumbUrl = getThumbnailUrl(note.files?.[0]?.url || note.cloudinaryUrl, ft, note.thumbnailUrl);
               return (
-              <Link key={note._id} to={`/notes/${note._id}`} className="hierarchy-card"
-                style={{ borderLeftColor: c.color, textDecoration: 'none', color: 'inherit', minHeight: 140 }}>
+              <Link key={note._id} to={`/notes/${note._id}`} className="hierarchy-card note-card"
+                style={{ borderLeftColor: c.color, textDecoration: 'none', color: 'inherit', minHeight: 180 }}>
                 <div style={{ display: 'flex', gap: 16, height: '100%' }}>
-                  <div style={{
+                  {thumbUrl ? (
+                  <div className="note-thumb" style={{
                     width: 100, borderRadius: 'var(--radius-sm)', flexShrink: 0,
                     backgroundImage: `url(${thumbUrl})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
-                    backgroundColor: c.color,
                   }} />
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '2px 0' }}>
-                    <span className="hierarchy-card-badge" style={{ background: c.bg, color: c.color }}>
-                      PDF · {note.fileSize ? `${(note.fileSize / 1024 / 1024).toFixed(1)} MB` : ''}
+                  ) : (
+                  <div className="note-thumb" style={{ width: 100, borderRadius: 'var(--radius-sm)', overflow: 'hidden', flexShrink: 0, background: 'var(--bg-subtle)' }}>
+                    <FileTypePlaceholder fileType={ft} height={160} />
+                  </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '4px 0' }}>
+                    <span className="hierarchy-card-badge" style={{ color: c.color, textTransform: 'capitalize' }}>
+                      {note.fileType || 'pdf'}
                     </span>
                     <div className="hierarchy-card-title" style={{ marginTop: 4 }}>{note.title}</div>
                     <div className="hierarchy-card-sub" style={{ marginTop: 2, flex: 1 }}>
                       {note.description || 'No description'}
                     </div>
                     <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-light)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span>by {note.userId?.fullname || 'Unknown'}</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>by {note.userId?.fullname || 'Unknown'}{note.userId?.isVerified && <BadgeCheck size={11} style={{ color: 'var(--primary)' }} />}</span>
                       <span>·</span>
-                      <span>{note.downloads || 0} downloads</span>
+                      <span style={{ textTransform: 'capitalize' }}>{(note.resourceType || 'study_notes').replace(/_/g, ' ')}</span>
                       {note.averageRating > 0 && (
                         <>
                           <span>·</span>
@@ -276,7 +323,7 @@ export default function Browse() {
       ) : (
         <div className="hierarchy-grid">
           {items.map((item, i) => {
-            const c = cardPalette[i % cardPalette.length];
+            const c = accentColor;
             const detailPath = level === 'universities' ? `/universities/${item._id}`
               : level === 'courses' ? `/courses/${item._id}`
               : level === 'semesters' ? `/semesters/${item._id}`
@@ -299,7 +346,7 @@ export default function Browse() {
                   <ExternalLink size={14} />
                 </Link>
               )}
-              <span className="hierarchy-card-badge" style={{ background: c.bg, color: c.color }}>
+              <span className="hierarchy-card-badge" style={{ color: c.color }}>
                 {singular}
               </span>
               <div className="hierarchy-card-title">{item.title || item.name || `Semester ${item.semesterNumber}`}</div>

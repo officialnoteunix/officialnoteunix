@@ -1,18 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-async function autoClearSuspension(user) {
-  if (user.suspendedUntil && user.suspendedUntil <= new Date()) {
-    user.banned = false;
-    user.suspendedUntil = null;
-    try {
-      await user.save();
-    } catch {
-      // Non-critical — continue with in-memory state
-    }
-  }
-}
-
 export async function authenticate(req, res, next) {
   try {
     const token = req.cookies?.accessToken || req.headers.authorization?.replace('Bearer ', '');
@@ -24,7 +12,6 @@ export async function authenticate(req, res, next) {
     if (!user) {
       return res.status(401).json({ success: false, message: 'User not found' });
     }
-    await autoClearSuspension(user);
     if (user.banned) {
       return res.status(401).json({ success: false, message: 'User not found or banned' });
     }
@@ -50,11 +37,8 @@ export async function optionalAuth(req, res, next) {
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
       const user = await User.findById(decoded.id).select('-passwordHash -refreshTokenHash');
-      if (user) {
-        await autoClearSuspension(user);
-        if (!user.banned) {
-          req.user = user;
-        }
+      if (user && !user.banned) {
+        req.user = user;
       }
     }
   } catch {

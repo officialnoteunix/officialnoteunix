@@ -72,11 +72,14 @@ export default function AuthContainer({ initialView = 'login' }: AuthContainerPr
       return;
     }
     try {
-      await register(
+      const res = await register(
         form.get('fullname') as string,
         form.get('email') as string,
         password
       );
+      if (res?.emailWarning) {
+        setError(res.emailWarning.message);
+      }
       const redirect = searchParams.get('redirect');
       if (redirect) return navigate(redirect);
       navigate('/user/dashboard');

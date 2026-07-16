@@ -1,9 +1,32 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, Trash2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import {
+  Bell, Check, Trash2, CheckCircle, XCircle, MessageCircle, Shield, UserPlus, FileText, Lock,
+} from 'lucide-react';
 import { notificationApi } from '../../api/notification';
 import { useAuth } from '../../context/AuthContext';
 import { useNotificationCount } from '../../context/NotificationContext';
+
+const TYPE_ICONS: Record<string, typeof CheckCircle> = {
+  note_approved: CheckCircle,
+  note_rejected: XCircle,
+  new_comment: MessageCircle,
+  report_resolved: Shield,
+  welcome: UserPlus,
+  note_uploaded: FileText,
+  password_changed: Lock,
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  note_approved: 'var(--secondary)',
+  note_rejected: 'var(--danger)',
+  new_comment: 'var(--primary)',
+  report_resolved: 'var(--warning)',
+  welcome: 'var(--primary)',
+  note_uploaded: 'var(--text-muted)',
+  password_changed: 'var(--text-muted)',
+};
 
 function getTimeAgo(date: string): string {
   const now = Date.now();
@@ -14,8 +37,19 @@ function getTimeAgo(date: string): string {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
+  if (days === 1) return 'Yesterday';
   if (days < 7) return `${days}d ago`;
-  return new Date(date).toLocaleDateString();
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
 }
 
 export default function NotificationBell() {
@@ -25,6 +59,7 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!open || !user) return;
@@ -96,7 +131,84 @@ export default function NotificationBell() {
     width: 36, height: 36, borderRadius: 'var(--radius-full)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     color: 'var(--text-muted)', position: 'relative' as const,
+    transition: 'background 0.15s',
   };
+
+  const dropdownContent = (
+    <>
+      <div className="notif-dropdown-backdrop" onClick={() => setOpen(false)} />
+      <div className="dropdown-panel notification-dropdown">
+        <div className="dropdown-header">
+          <span>Notifications {unreadCount > 0 && <span style={{ color: 'var(--danger)', fontSize: 12 }}>({unreadCount})</span>}</span>
+          {unreadCount > 0 && (
+            <button className="dropdown-action" onClick={handleMarkAllRead}>
+              Mark all read
+            </button>
+          )}
+        </div>
+
+        {notifications.length === 0 ? (
+          <div className="dropdown-empty" style={{ padding: '28px 16px' }}>
+            <Bell size={24} style={{ color: 'var(--text-light)', marginBottom: 8 }} />
+            <div>No notifications yet</div>
+          </div>
+        ) : (
+          <>
+            <div className="dropdown-items">
+              {notifications.map(n => {
+                const Icon = TYPE_ICONS[n.type] || FileText;
+                const iconColor = TYPE_COLORS[n.type] || 'var(--text-muted)';
+                const isUnread = !n.read;
+                return (
+                <div
+                  key={n._id}
+                  className={`dropdown-item ${isUnread ? 'dropdown-item--unread' : ''}`}
+                  onClick={() => handleNotificationClick(n)}
+                  style={{ cursor: 'pointer', position: 'relative' }}
+                >
+                  <div
+                    style={{
+                      width: 30, height: 30, borderRadius: 'var(--radius-full)',
+                      background: isUnread ? 'rgba(129,140,248,0.12)' : 'var(--bg-subtle)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, color: iconColor, transition: 'background 0.12s',
+                    }}
+                  >
+                    <Icon size={14} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: isUnread ? 700 : 500, fontSize: 13, marginBottom: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {n.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {n.message}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-light)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                    {getTimeAgo(n.createdAt)}
+                  </div>
+                </div>
+                );
+              })}
+            </div>
+            <div
+              onClick={() => { setOpen(false); navigate(user?.role === 'admin' ? '/admin/notifications' : '/user/notifications'); }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: 6, padding: '10px 16px', borderTop: '1px solid var(--border-color)',
+                fontSize: 13, fontWeight: 600, color: 'var(--primary)',
+                cursor: 'pointer', transition: 'background 0.12s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-subtle)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              View all notifications →
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
 
   return (
     <div ref={dropdownRef} style={{ position: 'relative' }}>
@@ -116,128 +228,7 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-          width: 380, background: 'var(--bg-card)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-md)',
-          boxShadow: 'var(--shadow-lg)',
-          zIndex: 1000, overflow: 'hidden',
-        }}>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            padding: '12px 16px',
-            borderBottom: '1px solid var(--border-color)',
-          }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>Notifications {unreadCount > 0 && <span style={{ color: 'var(--danger)', fontSize: 12 }}>({unreadCount})</span>}</span>
-            {unreadCount > 0 && (
-              <button
-                onClick={handleMarkAllRead}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--primary)', fontSize: 12, fontWeight: 600,
-                }}
-              >
-                Mark all read
-              </button>
-            )}
-          </div>
-
-          {notifications.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-              No notifications yet
-            </div>
-          ) : (
-            <>
-              {notifications.map(n => {
-                const isUnread = !n.read;
-                return (
-                  <div
-                    key={n._id}
-                    style={{
-                      padding: '10px 16px',
-                      borderBottom: '1px solid var(--border-color)',
-                      cursor: 'pointer',
-                      background: isUnread ? 'var(--primary-light)' : 'transparent',
-                      transition: 'background 0.2s',
-                      position: 'relative',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = 'var(--bg-subtle)';
-                      const actions = e.currentTarget.querySelector('.notif-actions') as HTMLElement;
-                      if (actions) actions.style.display = 'flex';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = isUnread ? 'var(--primary-light)' : 'transparent';
-                      const actions = e.currentTarget.querySelector('.notif-actions') as HTMLElement;
-                      if (actions) actions.style.display = 'none';
-                    }}
-                  >
-                    <div onClick={() => handleNotificationClick(n)}>
-                      <div style={{ fontWeight: isUnread ? 700 : 400, fontSize: 13, marginBottom: 2, paddingRight: 40 }}>
-                        {n.title}
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {n.message}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-light)' }}>
-                        {getTimeAgo(n.createdAt)}
-                      </div>
-                    </div>
-                    <div
-                      className="notif-actions"
-                      style={{
-                        display: 'none', position: 'absolute', top: 8, right: 8,
-                        gap: 2, alignItems: 'center',
-                      }}
-                    >
-                      {isUnread && (
-                        <button
-                          onClick={(e) => handleMarkRead(e, n._id)}
-                          title="Mark as read"
-                          style={{
-                            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                            width: 24, height: 24,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: 'var(--secondary)', padding: 0,
-                          }}
-                        >
-                          <Check size={12} />
-                        </button>
-                      )}
-                      <button
-                        onClick={(e) => handleDelete(e, n._id)}
-                        title="Dismiss"
-                        style={{
-                          background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                          borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                          width: 24, height: 24,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: 'var(--text-muted)', padding: 0,
-                        }}
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-              <div
-                onClick={() => { setOpen(false); navigate('/notifications'); }}
-                style={{
-                  padding: '10px 16px', textAlign: 'center',
-                  color: 'var(--primary)', fontSize: 13, fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                View all notifications
-              </div>
-            </>
-          )}
-        </div>
-      )}
+      {open && (isMobile ? createPortal(dropdownContent, document.body) : dropdownContent)}
     </div>
   );
 }

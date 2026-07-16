@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { adminApi } from '../../api/admin';
 import { useToast } from '../../context/ToastContext';
 import ConfirmModal from '../../components/ui/ConfirmModal';
-import { Send, Loader2, Users, User, Code, Eye, Info } from 'lucide-react';
+import { Send, Loader2, Users, User, Code, Eye, Info, Clock, AlertTriangle } from 'lucide-react';
 
 export default function Mail() {
   const { showToast } = useToast();
@@ -13,6 +13,7 @@ export default function Mail() {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [retryHours, setRetryHours] = useState<number | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   const insertPlaceholder = () => {
@@ -27,6 +28,7 @@ export default function Mail() {
   const doSend = async () => {
     setShowConfirm(false);
     setLoading(true);
+    setRetryHours(null);
     try {
       const html = message.replace(/\n/g, '<br>');
       const res = await adminApi.sendEmail({
@@ -36,13 +38,30 @@ export default function Mail() {
         recipientEmail: recipientType === 'single' ? recipientEmail : undefined,
       });
       const { sent, failed } = res.data.data;
-      showToast('success', `Email sent to ${sent} user${sent !== 1 ? 's' : ''}${failed > 0 ? ` (${failed} failed)` : ''}`);
-      setSubject('');
-      setMessage('');
-      setRecipientEmail('');
-      setPreview(false);
+      const rh = res.data.retryHours || null;
+      if (rh) setRetryHours(rh);
+      if (failed > 0 && sent > 0) {
+        showToast('warning', `Sent to ${sent} user${sent !== 1 ? 's' : ''}, ${failed} failed. Retry in ${rh}h.`);
+      } else if (failed > 0 && sent === 0) {
+        showToast('error', `All emails failed. Service recovers in ~${rh}h.`, 8000);
+      } else {
+        showToast('success', `Email sent to ${sent} user${sent !== 1 ? 's' : ''}`);
+      }
+      if (failed === 0) {
+        setSubject('');
+        setMessage('');
+        setRecipientEmail('');
+        setPreview(false);
+        setRetryHours(null);
+      }
     } catch (err: any) {
-      showToast('error', err?.response?.data?.message || err?.message || 'Failed to send email');
+      const rh = err?.response?.data?.retryHours;
+      if (rh) {
+        setRetryHours(rh);
+        showToast('error', `Email service unavailable. Please try again in ~${rh}h.`, 8000);
+      } else {
+        showToast('error', err?.response?.data?.message || err?.message || 'Failed to send email');
+      }
     } finally {
       setLoading(false);
     }
@@ -118,6 +137,24 @@ export default function Mail() {
           <Eye size={14} /> Preview
         </button>
       </div>
+
+      {/* Email service unavailable banner */}
+      {retryHours !== null && (
+        <div style={{
+          flexShrink: 0, marginBottom: 16, padding: '12px 16px', borderRadius: 'var(--radius-md)',
+          background: 'var(--warning-light, rgba(245,158,11,0.1))', border: '1px solid var(--warning, #f59e0b)',
+          display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-main)',
+        }}>
+          <AlertTriangle size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+          <div>
+            <strong>Email service temporarily unavailable.</strong>{' '}
+            <span style={{ color: 'var(--text-muted)' }}>
+              Daily limit reached. Resets in ~{retryHours}h.
+            </span>
+          </div>
+          <Clock size={14} style={{ color: 'var(--warning)', flexShrink: 0, marginLeft: 'auto' }} />
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Recipients */}

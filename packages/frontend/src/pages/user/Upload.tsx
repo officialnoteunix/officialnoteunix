@@ -7,7 +7,9 @@ import { semesterApi } from '../../api/semester';
 import { subjectApi } from '../../api/subject';
 import { useToast } from '../../context/ToastContext';
 import { getApiError } from '../../utils/constants';
-import { Upload as UploadIcon, ChevronLeft, Building2, BookOpen, Library, BookMarked, Loader2 } from 'lucide-react';
+import { Upload as UploadIcon, ChevronLeft, Building2, BookOpen, Library, BookMarked, Loader2, XCircle } from 'lucide-react';
+import FileTypePlaceholder from '../../components/ui/FileTypePlaceholder';
+import Select from '../../components/ui/Select';
 import SEO from '../../components/seo/SEO';
 
 interface HierarchyItem {
@@ -37,11 +39,29 @@ export default function Upload() {
   const { showToast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const RESOURCE_TYPES = [
+  { value: 'study_notes', label: 'Study Notes' },
+  { value: 'past_question', label: 'Past Question' },
+  { value: 'assignment', label: 'Assignment' },
+  { value: 'lab_report', label: 'Lab Report' },
+  { value: 'practical_file', label: 'Practical File' },
+  { value: 'reference_book', label: 'Reference Book' },
+  { value: 'syllabus', label: 'Syllabus' },
+  { value: 'study_guide', label: 'Study Guide' },
+  { value: 'important_question', label: 'Important Question' },
+  { value: 'mcq', label: 'MCQ' },
+  { value: 'department_resource', label: 'Department Resource' },
+];
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [resourceType, setResourceType] = useState('study_notes');
+  const [files, setFiles] = useState<File[]>([]);
+  const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const thumbRef = useRef<HTMLInputElement>(null);
 
   const [view, setView] = useState<ViewMode>('select');
   const [hLevel, setHLevel] = useState(0);
@@ -98,22 +118,24 @@ export default function Upload() {
   };
 
   const goBackToSelect = () => {
-    setTitle(''); setDescription(''); setFile(null);
+    setTitle(''); setDescription(''); setResourceType('study_notes'); setFiles([]);
     setView('select'); setHLevel(3);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !selectedSubjectId || !title) {
-      showToast('error', 'Please fill all required fields');
+    if (!files.length || !selectedSubjectId || !title) {
+      showToast('error', 'Please fill all required fields and select at least one file');
       return;
     }
     setUploading(true);
     const formData = new FormData();
-    formData.append('file', file);
+    files.forEach(f => formData.append('files', f));
+    if (thumbnail) formData.append('thumbnail', thumbnail);
     formData.append('subjectId', selectedSubjectId);
     formData.append('title', title);
     formData.append('description', description);
+    formData.append('resourceType', resourceType);
     try {
       await noteApi.create(formData);
       showToast('success', 'Note uploaded successfully! Awaiting admin approval.');
@@ -163,7 +185,7 @@ export default function Upload() {
             return (
               <button key={item._id} onClick={() => handleLevelClick(item)} className="hierarchy-card"
                 style={{ borderLeftColor: c.color } as React.CSSProperties}>
-                <span className="hierarchy-card-badge" style={{ background: c.bg, color: c.color }}>
+                <span className="hierarchy-card-badge" style={{ color: c.color }}>
                   {currentStep.label}
                 </span>
                 <div className="hierarchy-card-title">{item.name || item.title}</div>
@@ -204,34 +226,82 @@ export default function Upload() {
               <label>Description</label>
               <textarea className="form-input" value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of the notes..." rows={4} autoComplete="off" />
             </div>
+            <div className="form-group">
+              <label>Resource Type <span style={{ color: 'var(--danger)' }}>*</span></label>
+              <Select
+                value={resourceType}
+                onChange={(val) => setResourceType(val)}
+                options={RESOURCE_TYPES}
+              />
+            </div>
           </div>
           <div className="upload-h-dropzone">
-            <label>PDF File <span style={{ color: 'var(--danger)' }}>*</span></label>
+            <label>Files <span style={{ color: 'var(--danger)' }}>*</span></label>
             <div
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={e => { e.preventDefault(); setDragOver(false); }}
-              onDrop={e => { e.preventDefault(); setDragOver(false); setFile(e.dataTransfer.files[0]); }}
+              onDrop={e => { e.preventDefault(); setDragOver(false); setFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]); }}
               onClick={() => fileRef.current?.click()}
-              className={`upload-dropzone ${dragOver ? 'drag-over' : ''} ${file ? 'has-file' : ''}`}
+              className={`upload-dropzone ${dragOver ? 'drag-over' : ''} ${files.length ? 'has-file' : ''}`}
             >
-              {file ? (
-                <>
-                  <div className="upload-dropzone-icon" style={{ background: 'var(--secondary-light)', color: 'var(--secondary)' }}>
-                    <UploadIcon size={22} />
-                  </div>
-                  <p style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-main)', marginBottom: 2 }}>{file.name}</p>
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{(file.size / 1024 / 1024).toFixed(1)} MB · Click to change</p>
-                </>
+              {files.length ? (
+                <div style={{ textAlign: 'left', width: '100%', padding: 8 }}>
+                  {files.map((f, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-subtle)', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+                        <UploadIcon size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{(f.size / 1024 / 1024).toFixed(1)} MB</span>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setFiles(prev => prev.filter((_, idx) => idx !== i)); if (fileRef.current) fileRef.current.value = ''; }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 2, display: 'flex' }}>
+                          <XCircle size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>Click or drop to add more</p>
+                </div>
               ) : (
                 <>
                   <div className="upload-dropzone-icon" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
                     <UploadIcon size={22} />
                   </div>
-                  <p style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-main)', marginBottom: 4 }}>Drop PDF here</p>
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>or click to browse (max 10 MB)</p>
+                  <p style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-main)', marginBottom: 4 }}>Drop files here</p>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>or click to browse (max 10 MB each)</p>
                 </>
               )}
-              <input ref={fileRef} type="file" accept=".pdf" hidden onChange={e => setFile(e.target.files?.[0] || null)} />
+              <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.rtf,.jpg,.jpeg,.png,.gif,.webp" multiple hidden onChange={e => { if (e.target.files) setFiles(prev => [...prev, ...Array.from(e.target.files!)]); }} />
+            </div>
+          </div>
+          <div className="upload-h-dropzone" style={{ marginTop: 12 }}>
+            <label>Thumbnail <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>(optional)</span></label>
+            <div onClick={() => thumbRef.current?.click()}
+              style={{
+                border: '2px dashed var(--border-color)', borderRadius: 'var(--radius-sm)',
+                padding: thumbnail ? 8 : '20px', textAlign: 'center', cursor: 'pointer',
+                background: thumbnail ? 'var(--bg-subtle)' : 'transparent',
+              }}>
+              {thumbnail ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <img src={thumbnailPreview} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4 }} />
+                  <div style={{ flex: 1, textAlign: 'left', fontSize: 12 }}>
+                    <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{thumbnail.name}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{(thumbnail.size / 1024 / 1024).toFixed(1)} MB</div>
+                  </div>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); setThumbnail(null); setThumbnailPreview(''); if (thumbRef.current) thumbRef.current.value = ''; }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 4 }}>
+                    <XCircle size={14} />
+                  </button>
+                </div>
+              ) : (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Click to select a thumbnail image (optional)</p>
+              )}
+              <input ref={thumbRef} type="file" accept="image/*" hidden onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) { setThumbnail(file); setThumbnailPreview(URL.createObjectURL(file)); }
+              }} />
             </div>
           </div>
         </div>
@@ -239,6 +309,9 @@ export default function Upload() {
         <div style={{ display: 'flex', gap: 12, paddingTop: 24, borderTop: '1px solid var(--border-color)', marginTop: 24 }}>
           <button type="submit" className="btn-rounded btn-primary" style={{ padding: '12px 32px', fontSize: 14, gap: 8 }} disabled={uploading}>
             {uploading ? <><Loader2 size={16} className="spin" /> Uploading...</> : <><UploadIcon size={18} /> Upload Note</>}
+          </button>
+          <button type="button" onClick={() => { setFiles([]); if (fileRef.current) fileRef.current.value = ''; }} className="btn-rounded btn-ghost" style={{ padding: '12px 24px', fontSize: 14 }} disabled={files.length === 0 || uploading}>
+            Clear Files
           </button>
         </div>
       </form>

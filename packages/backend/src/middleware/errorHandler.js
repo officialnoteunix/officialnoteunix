@@ -25,6 +25,10 @@ export default function errorHandler(err, req, res, next) {
     return res.status(400).json({ success: false, message: `Invalid ${err.path}: ${err.value}` });
   }
 
+  if (err.name === 'DocumentNotFoundError') {
+    return res.status(404).json({ success: false, message: 'Document not found' });
+  }
+
   if (err.name === 'ValidationError') {
     const errors = {};
     if (err.errors) {

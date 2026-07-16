@@ -5,6 +5,7 @@ import { Bookmark } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { getApiError } from '../../utils/constants';
 import { getThumbnailUrl } from '../../utils/cloudinary';
+import FileTypePlaceholder from '../../components/ui/FileTypePlaceholder';
 import Pagination from '../../components/ui/Pagination';
 
 const palette = [
@@ -55,20 +56,27 @@ export default function Bookmarks() {
           <div className="hierarchy-grid">
             {bookmarks.map((note, i) => {
               const c = palette[i % palette.length];
-              const thumbUrl = getThumbnailUrl(note.cloudinaryUrl);
+              const ft = note.files?.[0]?.fileType || note.fileType;
+              const thumbUrl = getThumbnailUrl(note.files?.[0]?.url || note.cloudinaryUrl, ft, note.thumbnailUrl);
               return (
                 <Link key={note._id} to={`/notes/${note._id}`} className="hierarchy-card"
                   style={{ borderLeftColor: c.color, textDecoration: 'none', color: 'inherit' }}>
                   <div style={{ display: 'flex', gap: 12, height: '100%' }}>
+                    {thumbUrl ? (
                     <div style={{
                       width: 72, borderRadius: 'var(--radius-sm)', flexShrink: 0,
                       backgroundImage: `url(${thumbUrl})`,
                       backgroundSize: 'cover', backgroundPosition: 'center',
-                      backgroundRepeat: 'no-repeat', backgroundColor: c.color,
+                      backgroundRepeat: 'no-repeat',
                     }} />
-                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '2px 0' }}>
-                      <span className="hierarchy-card-badge" style={{ background: c.bg, color: c.color }}>
-                        {note.fileType?.toUpperCase() || 'PDF'} · {note.fileSize ? `${(note.fileSize / 1024 / 1024).toFixed(1)} MB` : ''}
+                    ) : (
+                    <div style={{ width: 72, borderRadius: 'var(--radius-sm)', overflow: 'hidden', flexShrink: 0, background: 'var(--bg-subtle)' }}>
+                      <FileTypePlaceholder fileType={ft} height={100} />
+                    </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '4px 0' }}>
+                      <span className="hierarchy-card-badge" style={{ color: c.color }}>
+                        {note.fileType?.toUpperCase() || 'PDF'}
                       </span>
                       <div className="hierarchy-card-title" style={{ marginTop: 4 }}>{note.title}</div>
                       <div className="hierarchy-card-sub" style={{ flex: 1, marginTop: 2 }}>
@@ -76,8 +84,8 @@ export default function Bookmarks() {
                       </div>
                       <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-light)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                         {note.subjectId && <span>{note.subjectId.name}</span>}
-                        {note.subjectId && note.downloads !== undefined && <span>·</span>}
-                        {note.downloads !== undefined && <span>{note.downloads} downloads</span>}
+                        {note.subjectId && <span>·</span>}
+                        <span style={{ textTransform: 'capitalize' }}>{(note.resourceType || 'study_notes').replace(/_/g, ' ')}</span>
                         <span>·</span>
                         <span>Bookmarked {note.bookmarkedAt ? new Date(note.bookmarkedAt).toLocaleDateString() : ''}</span>
                       </div>

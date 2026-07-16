@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import University from '../models/University.js';
 import Course from '../models/Course.js';
+import Semester from '../models/Semester.js';
+import Subject from '../models/Subject.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { escapeRegex } from '../utils/escapeRegex.js';
 import { validate } from '../middleware/validate.js';
 import { createContentSchema, updateContentSchema } from '../validators/adminValidator.js';
+import { cascadeDeleteUniversity } from '../utils/cascadeDelete.js';
 
 const router = Router();
 
@@ -50,8 +53,10 @@ router.patch('/:id', authenticate, authorize('admin'), validate(updateContentSch
 
 router.delete('/:id', authenticate, authorize('admin'), async (req, res, next) => {
   try {
-    await University.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: 'Deleted' });
+    const university = await University.findById(req.params.id);
+    if (!university) return res.status(404).json({ success: false, message: 'Not found' });
+    const result = await cascadeDeleteUniversity(University, Course, Semester, Subject, req.params.id);
+    res.json({ success: true, message: 'Deleted', data: result });
   } catch (err) { next(err); }
 });
 
