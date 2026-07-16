@@ -36,6 +36,9 @@ export default function Header() {
         <button onClick={() => setSearchOpen(true)} style={linkBtnStyle} aria-label="Search">
           <Search size={16} />
         </button>
+        <button onClick={toggleTheme} style={linkBtnStyle} aria-label="Toggle theme">
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
         <NotificationBell />
         {user ? (
           <Link to={user.role === 'admin' ? '/admin/dashboard' : '/user/dashboard'} className="btn-rounded btn-primary" style={{ padding: '8px 20px', fontSize: 13 }}>
