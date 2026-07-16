@@ -1,39 +1,13 @@
-import nodemailer from 'nodemailer';
+const SITE_URL = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const SITE_NAME = 'NoteUniX';
+const BREVO_API = 'https://api.brevo.com/v3/smtp/email';
 
-function createTransporter() {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) return null;
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS?.replace(/\s+/g, ''),
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 5000,
-  });
-}
-
-let _transporter = null;
-
-function getTransporter() {
-  if (_transporter) return _transporter;
-  _transporter = createTransporter();
-  if (!_transporter) {
-    console.warn('[EMAIL] SMTP not configured — emails disabled');
-  }
-  return _transporter;
-}
-
-let _emailEnabled = null;
-
+// ── Provider detection ──────────────────────────────────────────────
 export function isEmailEnabled() {
-  if (_emailEnabled !== null) return _emailEnabled;
-  _emailEnabled = !!(process.env.SMTP_HOST && process.env.SMTP_USER);
-  return _emailEnabled;
+  return !!process.env.BREVO_API_KEY;
 }
 
+// ── Retry info (rate limit resets midnight Pacific) ─────────────────
 export function getEmailRetryInfo() {
   const now = new Date();
   const pacificStr = now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
@@ -45,44 +19,70 @@ export function getEmailRetryInfo() {
   return { hours: Math.max(1, hours), resetsAt: midnightPacific.toISOString() };
 }
 
+// ── Startup verification ────────────────────────────────────────────
 export async function verifySmtp() {
-  const t = createTransporter();
-  if (!t) {
-    console.warn('[EMAIL] SMTP not configured — emails disabled');
+  if (!process.env.BREVO_API_KEY) {
+    console.warn('[EMAIL] BREVO_API_KEY not set — emails disabled');
     return false;
   }
-  try {
-    await t.verify();
-    console.log('[EMAIL] SMTP connection verified');
-    return true;
-  } catch (err) {
-    console.error('[EMAIL] SMTP verification failed:', err.message);
-    if (err.response) console.error('[EMAIL] Server response:', err.response);
-    return false;
-  }
+  console.log('[EMAIL] Brevo API key configured');
+  return true;
 }
 
-async function sendMail(options) {
-  const t = getTransporter();
-  if (!t) {
-    console.warn(`[EMAIL] Skipped "${options.subject}" — SMTP not configured`);
+// ── Brevo REST API send ─────────────────────────────────────────────
+function getSenderEmail() {
+  return process.env.BREVO_SENDER_EMAIL || 'officialnoteunix@gmail.com';
+}
+
+function getSenderName() {
+  return process.env.BREVO_SENDER_NAME || SITE_NAME;
+}
+
+async function sendMail({ to, subject, html }) {
+  if (!process.env.BREVO_API_KEY) {
+    console.warn(`[EMAIL] Skipped "${subject}" — BREVO_API_KEY not set`);
     return { success: false, reason: 'not_configured' };
   }
+
   try {
-    const info = await t.sendMail(options);
-    console.log(`[EMAIL] Sent "${options.subject}" to ${options.to} — ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
+    const response = await fetch(BREVO_API, {
+      method: 'POST',
+      headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { email: getSenderEmail(), name: getSenderName() },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      console.log(`[EMAIL] Sent "${subject}" to ${to} — ${data.messageId}`);
+      return { success: true, messageId: data.messageId };
+    }
+
+    const statusCode = response.status;
+    const errorMessage = data.message || `HTTP ${statusCode}`;
+    console.error(`[EMAIL] Failed "${subject}" to ${to}: [${statusCode}] ${errorMessage}`);
+
+    if (statusCode === 429 || statusCode === 401) {
+      const retry = getEmailRetryInfo();
+      return { success: false, reason: `[${statusCode}] ${errorMessage}`, retryHours: retry.hours, statusCode };
+    }
+    return { success: false, reason: `[${statusCode}] ${errorMessage}`, statusCode };
   } catch (err) {
-    console.error(`[EMAIL] Failed to send "${options.subject}" to ${options.to}:`, err.message);
-    if (err.response) console.error(`[EMAIL] SMTP response:`, err.response);
-    const retry = getEmailRetryInfo();
-    return { success: false, reason: err.message, retryHours: retry.hours };
+    console.error(`[EMAIL] Network error sending "${subject}" to ${to}:`, err.message);
+    return { success: false, reason: err.message };
   }
 }
 
-const SITE_URL = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const SITE_NAME = 'NoteUniX';
-
+// ── Email templates ─────────────────────────────────────────────────
 function wrapTemplate(title, bodyHtml) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -119,7 +119,6 @@ function wrapTemplate(title, bodyHtml) {
 
 export async function sendVerificationEmail(email, verifyUrl, fullname) {
   return await sendMail({
-    from: process.env.SMTP_FROM || `${SITE_NAME} <${process.env.SMTP_USER}>`,
     to: email,
     subject: `Verify your email address — ${SITE_NAME}`,
     html: wrapTemplate('Verify your email address', `
@@ -137,7 +136,6 @@ export async function sendVerificationEmail(email, verifyUrl, fullname) {
 
 export async function sendWelcomeEmail(email, fullname) {
   return await sendMail({
-    from: process.env.SMTP_FROM || `${SITE_NAME} <${process.env.SMTP_USER}>`,
     to: email,
     subject: `Welcome to ${SITE_NAME}!`,
     html: wrapTemplate('Welcome to NoteUniX!', `
@@ -192,7 +190,6 @@ export async function sendWelcomeEmail(email, fullname) {
 
 export async function sendResetEmail(email, resetUrl) {
   return await sendMail({
-    from: process.env.SMTP_FROM || `${SITE_NAME} <${process.env.SMTP_USER}>`,
     to: email,
     subject: `Reset your password — ${SITE_NAME}`,
     html: wrapTemplate('Reset your password', `
@@ -209,7 +206,6 @@ export async function sendResetEmail(email, resetUrl) {
 
 export async function sendPasswordChangedEmail(email) {
   return await sendMail({
-    from: process.env.SMTP_FROM || `${SITE_NAME} <${process.env.SMTP_USER}>`,
     to: email,
     subject: `Password changed — ${SITE_NAME}`,
     html: wrapTemplate('Password updated', `
@@ -221,7 +217,6 @@ export async function sendPasswordChangedEmail(email) {
 
 export async function sendCustomEmail({ to, subject, html, from }) {
   return await sendMail({
-    from: from || process.env.SMTP_FROM || `${SITE_NAME} <${process.env.SMTP_USER}>`,
     to,
     subject,
     html: wrapTemplate(subject, `

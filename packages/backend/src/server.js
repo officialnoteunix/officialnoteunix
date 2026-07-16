@@ -44,14 +44,12 @@ async function startupCheck() {
     allPassed = check(`${desc} (${key})`, !!process.env[key]) && allPassed;
   }
   const optional = {
-    SMTP_HOST: 'Email (SMTP)',
-    SMTP_USER: 'Email (SMTP)',
-    SMTP_PASS: 'Email (SMTP)',
+    BREVO_API_KEY: 'Email (Brevo)',
     GOOGLE_CLIENT_ID: 'Google OAuth',
     GOOGLE_CLIENT_SECRET: 'Google OAuth',
   };
   for (const [key, desc] of Object.entries(optional)) {
-    check(`${desc} (${key})`, !!process.env[key], process.env[key] ? 'configured' : 'not configured — feature disabled');
+    check(`${desc} (${key})`, !!process.env[key], process.env[key] ? 'configured' : 'not configured');
   }
 
   // ── 2. JWT Secrets Strength ─────────────────────────────
@@ -77,26 +75,13 @@ async function startupCheck() {
     allPassed = check('API connection', false, err.message) && allPassed;
   }
 
-  // ── 4. SMTP / Email ─────────────────────────────────────
-  console.log('\n[4/6] SMTP / Email');
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
-    check('Configuration', false, 'SMTP not configured — emails disabled');
+  // ── 4. Email ──────────────────────────────────────────────
+  console.log('\n[4/6] Email');
+  const hasBrevo = !!process.env.BREVO_API_KEY;
+  if (hasBrevo) {
+    allPassed = check('Brevo API Key', true, 'configured') && allPassed;
   } else {
-    try {
-      const nodemailer = (await import('nodemailer')).default;
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS?.replace(/\s+/g, '') },
-        connectionTimeout: 8000,
-        greetingTimeout: 5000,
-      });
-      await transporter.verify();
-      allPassed = check('SMTP connection', true, `${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`) && allPassed;
-    } catch (err) {
-      allPassed = check('SMTP connection', false, err.message) && allPassed;
-    }
+    allPassed = check('Brevo API Key', false, 'not configured — emails disabled') && allPassed;
   }
 
   // ── 5. Google OAuth ─────────────────────────────────────
