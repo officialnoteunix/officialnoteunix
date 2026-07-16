@@ -50,3 +50,6 @@ coverage/
 
 # ESLint cache
 .eslintcache
+
+# Seed script (local only)
+packages/backend/src/scripts/seed.js
