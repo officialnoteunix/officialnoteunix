@@ -45,7 +45,7 @@ export default function VerifyEmail() {
       await authApi.resendVerification(email);
       setMessage('New verification email sent!');
       setStatus('success');
-    } catch (err) {
+    } catch (err: any) {
       const errData = err.response?.data;
       if (err.response?.status === 503 && errData?.retryHours) {
         setStatus('email_unavailable');

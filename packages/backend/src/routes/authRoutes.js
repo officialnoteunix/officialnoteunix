@@ -166,56 +166,11 @@ router.get('/verify-email', async (req, res, next) => {
 });
 
 router.post('/resend-verification', async (req, res, next) => {
-  try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: 'Email required' });
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ success: false, message: 'No account with that email' });
-    if (user.emailVerified) return res.status(400).json({ success: false, message: 'Email already verified' });
-    const verifyToken = crypto.randomBytes(32).toString('hex');
-    user.emailVerifyToken = crypto.createHash('sha256').update(verifyToken).digest('hex');
-    user.emailVerifyExpiry = new Date(Date.now() + 1 * 60 * 60 * 1000);
-    await user.save();
-    const verifyUrl = `${process.env.CORS_ORIGIN || 'http://localhost:5173'}/verify-email?token=${verifyToken}&email=${encodeURIComponent(email)}`;
-    try {
-      const result = await sendVerificationEmail(email, verifyUrl, user.fullname);
-      if (result && !result.success) {
-        const retry = getEmailRetryInfo();
-        return res.status(503).json({ success: false, message: `Email service is temporarily unavailable. Please try again in ${retry.hours} hour${retry.hours > 1 ? 's' : ''}.`, retryHours: retry.hours });
-      }
-    } catch (err) {
-      console.warn(`[AUTH] Resend verification email failed for ${email}:`, err.message);
-      const retry = getEmailRetryInfo();
-      return res.status(503).json({ success: false, message: `Email service is temporarily unavailable. Please try again in ${retry.hours} hour${retry.hours > 1 ? 's' : ''}.`, retryHours: retry.hours });
-    }
-    res.json({ success: true, message: 'Verification email sent' });
-  } catch (err) { next(err); }
+  res.status(501).json({ success: false, message: 'Email verification is not yet available.' });
 });
 
 router.post('/forgot-password', async (req, res, next) => {
-  try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: 'Email required' });
-    const user = await User.findOne({ email });
-    if (!user) return res.json({ success: true, message: 'If an account exists, a reset link has been sent.' });
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    user.resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
-    user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
-    await user.save();
-    const resetUrl = `${process.env.CORS_ORIGIN || 'http://localhost:5173'}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
-    try {
-      const result = await sendResetEmail(email, resetUrl);
-      if (result && !result.success) {
-        const retry = getEmailRetryInfo();
-        return res.status(503).json({ success: false, message: `Email service is temporarily unavailable. Please try again in ${retry.hours} hour${retry.hours > 1 ? 's' : ''}.`, retryHours: retry.hours });
-      }
-    } catch (err) {
-      console.warn(`[AUTH] Reset email failed for ${email}:`, err.message);
-      const retry = getEmailRetryInfo();
-      return res.status(503).json({ success: false, message: `Email service is temporarily unavailable. Please try again in ${retry.hours} hour${retry.hours > 1 ? 's' : ''}.`, retryHours: retry.hours });
-    }
-    res.json({ success: true, message: 'If an account exists, a reset link has been sent.' });
-  } catch (err) { next(err); }
+  res.status(501).json({ success: false, message: 'Password reset is not yet available. Coming soon.' });
 });
 
 router.post('/reset-password', async (req, res, next) => {

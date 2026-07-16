@@ -2,6 +2,7 @@ export interface APIResponse<T> {
   success: boolean;
   data: T;
   message?: string;
+  retryHours?: number;
 }
 
 export interface PaginatedData<T> {

@@ -3,7 +3,6 @@ import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { userApi } from '../../api/user';
-import { authApi } from '../../api/auth';
 import { useLocalStorage, useLocalStorageNum } from '../../utils/useLocalStorage';
 import {
   LayoutDashboard, Bookmark, FileText, Flag, Settings, Bell,
@@ -12,8 +11,6 @@ import {
 import NotificationBell from '../notification/NotificationBell';
 import LogoutModal from '../ui/LogoutModal';
 import { useNotificationCount } from '../../context/NotificationContext';
-import { useToast } from '../../context/ToastContext';
-import { getApiError } from '../../utils/constants';
 
 export default function UserLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -24,7 +21,6 @@ export default function UserLayout() {
   const { theme, toggleTheme } = useTheme();
   const { pathname } = useLocation();
   const { unreadCount } = useNotificationCount();
-  const { showToast } = useToast();
 
   useEffect(() => {
     userApi.dashboardStats().then(r => setStats(r.data.data)).catch(() => {});
@@ -145,22 +141,6 @@ export default function UserLayout() {
           </div>
         </header>
         <main className="dashboard-content">
-          {user && !user.emailVerified && (
-            <div style={{
-              background: 'var(--warning-light)', color: 'var(--warning)',
-              padding: '10px 16px', fontSize: 13, borderRadius: 'var(--radius-md)',
-              marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <span>⚠️ Please verify your email address.</span>
-              <button
-                onClick={() => authApi.resendVerification(user.email).then(() => showToast('success', 'Verification email sent!')).catch(err => showToast('error', getApiError(err, 'Failed to send verification email.')))}
-                style={{
-                  background: 'none', border: 'none', color: 'var(--warning)', fontWeight: 600,
-                  cursor: 'pointer', fontSize: 13, textDecoration: 'underline', padding: 0,
-                }}
-              >Resend</button>
-            </div>
-          )}
           <Outlet />
         </main>
       </div>

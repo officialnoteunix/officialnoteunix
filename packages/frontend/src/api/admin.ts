@@ -35,7 +35,7 @@ export const adminApi = {
   auditLogs: (page = 1, limit = 30) =>
     api.get<APIResponse<PaginatedData<AuditLog>>>('/admin/audit-logs', { params: { page, limit } }),
   sendEmail: (data: { subject: string; html: string; recipientType: 'all' | 'single'; recipientEmail?: string }) =>
-    api.post<APIResponse<{ sent: number; failed: number; errors: Array<{ email: string; error: string }> }>>('/admin/send-email', data),
+    api.post<APIResponse<{ sent: number; failed: number; errors: Array<{ email: string; error: string }>; retryHours?: number }>>('/admin/send-email', data),
   replyContact: (id: string, replyContent: string) =>
     api.post<APIResponse<any>>(`/admin/contact/${id}/reply`, { replyContent }),
 };

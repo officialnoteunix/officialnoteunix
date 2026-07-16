@@ -78,7 +78,7 @@ export default function Messages() {
       const rh = err?.response?.data?.retryHours;
       if (rh) {
         setRetryHours(rh);
-        showToast('error', `Email service unavailable. Please try again in ~${rh}h.`, 8000);
+        showToast('error', `Email service unavailable. Please try again in ~${rh}h.`);
       } else {
         showToast('error', getApiError(err, 'Failed to send reply'));
       }

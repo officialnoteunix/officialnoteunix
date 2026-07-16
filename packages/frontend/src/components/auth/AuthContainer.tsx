@@ -77,9 +77,6 @@ export default function AuthContainer({ initialView = 'login' }: AuthContainerPr
         form.get('email') as string,
         password
       );
-      if (res?.emailWarning) {
-        setError(res.emailWarning.message);
-      }
       const redirect = searchParams.get('redirect');
       if (redirect) return navigate(redirect);
       navigate('/user/dashboard');
@@ -240,7 +237,7 @@ export default function AuthContainer({ initialView = 'login' }: AuthContainerPr
                   </div>
 
                   <div className="auth-forgot-wrap">
-                    <Link to="/forgot-password" className="auth-forgot-link">Forget Your Password?</Link>
+                    <span className="auth-forgot-link" style={{ opacity: 0.5, cursor: 'not-allowed' }}>Forget Your Password? (Coming Soon)</span>
                   </div>
 
                   <div className="auth-submit-wrap">

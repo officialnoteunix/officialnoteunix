@@ -43,7 +43,7 @@ export default function Mail() {
       if (failed > 0 && sent > 0) {
         showToast('warning', `Sent to ${sent} user${sent !== 1 ? 's' : ''}, ${failed} failed. Retry in ${rh}h.`);
       } else if (failed > 0 && sent === 0) {
-        showToast('error', `All emails failed. Service recovers in ~${rh}h.`, 8000);
+        showToast('error', `All emails failed. Service recovers in ~${rh}h.`);
       } else {
         showToast('success', `Email sent to ${sent} user${sent !== 1 ? 's' : ''}`);
       }
@@ -58,7 +58,7 @@ export default function Mail() {
       const rh = err?.response?.data?.retryHours;
       if (rh) {
         setRetryHours(rh);
-        showToast('error', `Email service unavailable. Please try again in ~${rh}h.`, 8000);
+        showToast('error', `Email service unavailable. Please try again in ~${rh}h.`);
       } else {
         showToast('error', err?.response?.data?.message || err?.message || 'Failed to send email');
       }
