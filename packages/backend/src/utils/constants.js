@@ -53,6 +53,10 @@ export const MIME_TO_EXT = {
   'application/vnd.oasis.opendocument.text': 'odt',
   'application/vnd.oasis.opendocument.presentation': 'odp',
   'application/vnd.oasis.opendocument.spreadsheet': 'ods',
+  'application/zip': 'zip',
+  'application/x-zip-compressed': 'zip',
+  'application/x-7z-compressed': '7z',
+  'application/x-rar-compressed': 'rar',
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/gif': 'gif',
@@ -70,5 +74,6 @@ export const EXT_TO_MIME = {
   odt: 'application/vnd.oasis.opendocument.text',
   odp: 'application/vnd.oasis.opendocument.presentation',
   ods: 'application/vnd.oasis.opendocument.spreadsheet',
+  zip: 'application/zip', '7z': 'application/x-7z-compressed', rar: 'application/x-rar-compressed',
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
 };

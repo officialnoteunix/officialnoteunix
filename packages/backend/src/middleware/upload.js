@@ -42,6 +42,10 @@ const ALLOWED_MIMES = [
   'application/vnd.oasis.opendocument.text',
   'application/vnd.oasis.opendocument.presentation',
   'application/vnd.oasis.opendocument.spreadsheet',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-7z-compressed',
+  'application/x-rar-compressed',
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
 ];
 
@@ -51,7 +55,9 @@ const fileFilter = (req, file, cb) => {
   if (ALLOWED_MIMES.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Unsupported file type. Allowed: PDF, DOCX, PPTX, XLSX, TXT, RTF, ODF, images'), false);
+    const err = new Error('Unsupported file type. Allowed: PDF, DOCX, PPTX, XLSX, ZIP, TXT, RTF, ODF, images');
+    err.status = 400;
+    cb(err, false);
   }
 };
 
