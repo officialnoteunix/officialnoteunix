@@ -6,13 +6,34 @@ export function uploadBuffer(buffer, options = {}) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       { folder, resourceType },
-      (err, result) => (err ? reject(err) : resolve(result))
+      (err, result) => {
+        if (err) {
+          const e = new Error(err.message || 'Cloudinary upload failed');
+          e.status = err.http_code || 500;
+          return reject(e);
+        }
+        resolve(result);
+      }
     );
+    stream.on('error', (err) => {
+      const e = new Error(err.message || 'Cloudinary stream error');
+      e.status = 500;
+      reject(e);
+    });
     stream.end(buffer);
   });
 }
 
 export async function uploadFiles(uploadedFiles, folder = 'noteunix/notes') {
+  for (const f of uploadedFiles) {
+    const isImage = f.mimetype?.startsWith('image/');
+    const isArchive = ['application/zip', 'application/x-zip-compressed', 'application/x-7z-compressed', 'application/x-rar-compressed'].includes(f.mimetype);
+    if (isArchive) {
+      const err = new Error(`"${f.originalname}" is a compressed archive. Please upload the uncompressed file directly (PDF, DOCX, etc.)`);
+      err.status = 400;
+      throw err;
+    }
+  }
   return Promise.all(uploadedFiles.map(async (f) => {
     const isImage = f.mimetype?.startsWith('image/');
     const result = await uploadBuffer(f.buffer, { folder, resourceType: isImage ? 'auto' : 'raw' });
