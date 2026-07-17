@@ -336,7 +336,7 @@ export default function Notes() {
             );
           })}
         </nav>
-        <button onClick={cancelUpload} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, marginLeft: 'auto' }}>Cancel</button>
+        <button onClick={cancelUpload} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, flexShrink: 0 }}>Cancel</button>
 
       {hLoading ? (
         <div className="loading-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
@@ -380,7 +380,7 @@ export default function Notes() {
             );
           })}
         </nav>
-        <button onClick={cancelUpload} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, marginLeft: 'auto' }}>Cancel</button>
+        <button onClick={cancelUpload} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, flexShrink: 0 }}>Cancel</button>
 
       <form onSubmit={handleUpload} autoComplete="off">
         <div className="upload-h-row">
