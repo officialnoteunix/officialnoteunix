@@ -88,7 +88,6 @@ export default function AuthContainer({ initialView = 'login' }: AuthContainerPr
   };
 
   const handleGoogleLogin = () => {
-    console.log('VITE_BACKEND_URL:', import.meta.env.VITE_BACKEND_URL);
     window.location.href = `${import.meta.env.VITE_BACKEND_URL}/api/auth/google`;
   };
 

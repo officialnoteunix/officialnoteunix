@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_BACKEND_URL ? `${import.meta.env.VITE_BACKEND_URL}/api` : '/api',
   withCredentials: true,
 });
 
@@ -12,7 +12,8 @@ api.interceptors.response.use(
     if (err.response?.status === 401 && err.response?.data?.code === 'TOKEN_EXPIRED' && !original._retry) {
       original._retry = true;
       try {
-        await axios.get('/api/auth/refresh', { withCredentials: true });
+        const refreshBase = import.meta.env.VITE_BACKEND_URL || '';
+        await axios.get(`${refreshBase}/api/auth/refresh`, { withCredentials: true });
         return api(original);
       } catch {
         window.dispatchEvent(new CustomEvent('auth:expired'));
