@@ -7,7 +7,7 @@ import { semesterApi } from '../../api/semester';
 import { subjectApi } from '../../api/subject';
 import { useToast } from '../../context/ToastContext';
 import { getApiError } from '../../utils/constants';
-import { Upload as UploadIcon, ChevronLeft, Building2, BookOpen, Library, BookMarked, Loader2, XCircle, Search } from 'lucide-react';
+import { Upload as UploadIcon, ChevronLeft, ChevronRight, Building2, BookOpen, Library, BookMarked, Loader2, XCircle, Search } from 'lucide-react';
 import FileTypePlaceholder from '../../components/ui/FileTypePlaceholder';
 import Select from '../../components/ui/Select';
 import SEO from '../../components/seo/SEO';
@@ -174,27 +174,37 @@ export default function Upload() {
   const renderSelector = () => (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div className="breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, flex: 1, minWidth: 0 }}>
+        <nav className="breadcrumb" style={{ flex: 1, minWidth: 0 }}>
           {hLevel > 0 && (
-            <button onClick={handleBack} className="btn-rounded btn-ghost bc-item-btn" style={{ padding: '6px 8px', flexShrink: 0, fontSize: 12 }}>
+            <button onClick={handleBack} className="btn-rounded btn-ghost" style={{ padding: '6px 8px', flexShrink: 0, fontSize: 12 }}>
               <ChevronLeft size={14} />
             </button>
           )}
-          <button onClick={() => navigate('/user/my-notes')} className="bc-item-btn bc-root-btn" style={{ background: 'none', border: 'none', cursor: 'pointer', color: selectedPath.length === 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: selectedPath.length === 0 ? 700 : 400, padding: 0, fontSize: 13 }}>
+          <button onClick={() => navigate('/user/my-notes')} className={`bc-item-btn ${selectedPath.length === 0 ? 'bc-active' : ''}`}>
             All Notes
           </button>
+          {selectedPath.length > 2 && (
+            <>
+              <span className="bc-sep bc-mobile-hidden"><ChevronRight size={12} /></span>
+              <span className="bc-ellipsis">
+                <span className="bc-sep"><ChevronRight size={12} /></span>
+                <span style={{ color: 'var(--text-light)', fontSize: 13 }}>…</span>
+              </span>
+            </>
+          )}
           {selectedPath.map((item, i) => {
-            const isLastTwo = i >= selectedPath.length - 2;
+            const isLast = i === selectedPath.length - 1;
+            const mobileHidden = selectedPath.length > 2 && !isLast ? 'bc-mobile-hidden' : '';
             return (
-            <span key={i} className={isLastTwo ? '' : 'bc-mobile-hidden'} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span className="bc-sep" style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>
-              <button onClick={() => goToLevel(i + 1)} className="bc-item-btn" style={{ background: 'none', border: 'none', cursor: 'pointer', color: i === selectedPath.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === selectedPath.length - 1 ? 700 : 400, padding: 0, fontSize: 13, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
+            <span key={i} className={mobileHidden} style={{ display: 'flex', alignItems: 'center' }}>
+              <span className={`bc-sep ${mobileHidden}`}><ChevronRight size={12} /></span>
+              <button onClick={() => goToLevel(i + 1)} className={`bc-item-btn ${isLast ? 'bc-active' : ''}`}>
                 {item.name}
               </button>
             </span>
             );
           })}
-        </div>
+        </nav>
         <button onClick={() => navigate('/user/my-notes')} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, flexShrink: 0 }}>Cancel</button>
       </div>
 
@@ -237,19 +247,22 @@ export default function Upload() {
   const renderUploadForm = () => (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
-        <div className="breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, flex: 1, minWidth: 0 }}>
-          <button onClick={goBackToSelect} className="btn-rounded btn-ghost bc-item-btn" style={{ padding: '6px 8px', flexShrink: 0, fontSize: 12 }}>
+        <nav className="breadcrumb" style={{ flex: 1, minWidth: 0 }}>
+          <button onClick={goBackToSelect} className="btn-rounded btn-ghost" style={{ padding: '6px 8px', flexShrink: 0, fontSize: 12 }}>
             <ChevronLeft size={14} />
           </button>
-          {selectedPath.map((item, i) => (
-            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {i > 0 && <span className="bc-sep" style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>}
-              <span className="bc-item-btn" style={{ color: i === selectedPath.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === selectedPath.length - 1 ? 700 : 400, fontSize: 13, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selectedPath.map((item, i) => {
+            const isLast = i === selectedPath.length - 1;
+            return (
+            <span key={i} style={{ display: 'flex', alignItems: 'center' }}>
+              {i > 0 && <span className="bc-sep"><ChevronRight size={12} /></span>}
+              <span className={`bc-item-btn ${isLast ? 'bc-active' : ''}`} style={{ cursor: 'default' }}>
                 {item.name}
               </span>
             </span>
-          ))}
-        </div>
+            );
+          })}
+        </nav>
         <button onClick={() => navigate('/user/my-notes')} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, flexShrink: 0 }}>Cancel</button>
       </div>
 

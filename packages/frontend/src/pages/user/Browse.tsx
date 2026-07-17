@@ -6,7 +6,7 @@ import { semesterApi } from '../../api/semester';
 import { subjectApi } from '../../api/subject';
 import { getThumbnailUrl } from '../../utils/cloudinary';
 import FileTypePlaceholder from '../../components/ui/FileTypePlaceholder';
-import { Search, FileText, Building, ArrowLeft, Filter, Upload, BadgeCheck } from 'lucide-react';
+import { Search, FileText, Building, ArrowLeft, ChevronRight, Filter, Upload, BadgeCheck } from 'lucide-react';
 import Select from '../../components/ui/Select';
 
 const RESOURCE_TYPES = [
@@ -161,22 +161,33 @@ export default function Browse() {
               <ArrowLeft size={14} />
             </button>
           )}
-          <div className="breadcrumb">
-            <button onClick={reset} className="bc-item-btn bc-root-btn" style={{ background: 'none', border: 'none', cursor: 'pointer', color: hierarchy.length === 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: hierarchy.length === 0 ? 700 : 400, padding: 0, fontSize: 13 }}>
+          <nav className="breadcrumb" aria-label="Breadcrumb">
+            <button onClick={reset} className={`bc-item-btn ${hierarchy.length === 0 ? 'bc-active' : ''}`}>
               All Notes
             </button>
+            {hierarchy.length > 2 && (
+              <>
+                <span className="bc-sep bc-mobile-hidden"><ChevronRight size={12} /></span>
+                <span className="bc-ellipsis">
+                  <span className="bc-sep"><ChevronRight size={12} /></span>
+                  <span style={{ color: 'var(--text-light)', fontSize: 13 }}>…</span>
+                </span>
+              </>
+            )}
             {hierarchy.map((item, i) => {
-              const isLastTwo = i >= hierarchy.length - 2;
+              const isLast = i === hierarchy.length - 1;
+              // On mobile: when >2 levels, hide all except the last item
+              const mobileHidden = hierarchy.length > 2 && !isLast ? 'bc-mobile-hidden' : '';
               return (
-              <span key={i} className={isLastTwo ? '' : 'bc-mobile-hidden'} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className="bc-sep" style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>
-                <button onClick={() => goToLevel(i + 1)} className="bc-item-btn" style={{ background: 'none', border: 'none', cursor: 'pointer', color: i === hierarchy.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === hierarchy.length - 1 ? 700 : 400, padding: 0, fontSize: 13, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
+              <span key={i} className={mobileHidden} style={{ display: 'flex', alignItems: 'center' }}>
+                <span className={`bc-sep ${mobileHidden}`}><ChevronRight size={12} /></span>
+                <button onClick={() => goToLevel(i + 1)} className={`bc-item-btn ${isLast ? 'bc-active' : ''}`}>
                   {item.name}
                 </button>
               </span>
               );
             })}
-          </div>
+          </nav>
         </div>
         <div className="filter-search-row">
           {level === 'notes' && (
