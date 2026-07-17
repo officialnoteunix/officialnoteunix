@@ -26,7 +26,7 @@ export default function AuthContainer({ initialView = 'login' }: AuthContainerPr
   const [showPwdLogin, setShowPwdLogin] = useState(false);
   const [showPwdReg, setShowPwdReg] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const { login, register, googleLogin } = useAuth();
+  const { login, register } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -87,19 +87,8 @@ export default function AuthContainer({ initialView = 'login' }: AuthContainerPr
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      const user = await googleLogin();
-      const redirect = searchParams.get('redirect');
-      if (redirect) return navigate(redirect);
-      navigate(user.role === 'admin' ? '/admin/dashboard' : '/user/dashboard');
-    } catch (err: any) {
-      setError(getApiError(err, 'Google sign-in failed'));
-    } finally {
-      setLoading(false);
-    }
+  const handleGoogleLogin = () => {
+    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/api/auth/google`;
   };
 
   const switchView = (to: 'login' | 'register') => {

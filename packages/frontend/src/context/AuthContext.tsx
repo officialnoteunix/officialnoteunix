@@ -19,7 +19,6 @@ interface AuthContextType {
   register: (fullname: string, email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  googleLogin: () => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,12 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const googleLogin = async () => {
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://noteunix-backend.onrender.com';
-    window.location.href = `${backendUrl}/api/auth/google`;
-    return new Promise<User>(() => {});
-  };
-
   const refreshUser = async () => {
     try {
       const res = await authApi.me();
@@ -76,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, googleLogin }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
