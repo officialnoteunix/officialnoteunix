@@ -209,14 +209,19 @@ router.get('/google', (req, res, next) => {
   passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next);
 });
 
-router.get('/google/callback',
-  (req, res, next) => {
-    if (!isGoogleConfigured()) return res.status(501).json({ success: false, message: 'Google OAuth not configured' });
-    passport.authenticate('google', { session: false, failureRedirect: '/login' })(req, res, next);
-  },
-  async (req, res, next) => {
+router.get('/google/callback', (req, res, next) => {
+  if (!isGoogleConfigured()) return res.status(501).json({ success: false, message: 'Google OAuth not configured' });
+  
+  passport.authenticate('google', { session: false }, async (err, user, info) => {
+    const frontendUrl = (process.env.CORS_ORIGIN || process.env.BACKEND_URL || 'http://localhost:5173').replace(/\/api\/?$/, '');
+    
+    if (err || !user) {
+      console.error('[AUTH] Google OAuth Callback Error:', err || info);
+      const redirectUrl = `${frontendUrl}/login?error=oauth_failed`;
+      return res.redirect(redirectUrl);
+    }
+    
     try {
-      const user = req.user;
       const accessToken = generateAccessToken(user);
       const { token: refreshToken, prefix: refreshTokenPrefix } = generateRefreshToken();
       user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
@@ -224,14 +229,12 @@ router.get('/google/callback',
       await user.save();
 
       setAuthCookies(res, accessToken, refreshToken);
-      let frontendUrl = process.env.NODE_ENV === 'production'
-        ? (process.env.BACKEND_URL || 'http://localhost:5000')
-        : (process.env.CORS_ORIGIN || 'http://localhost:5173');
-      frontendUrl = frontendUrl.replace(/\/api\/?$/, '');
       const redirectUrl = `${frontendUrl}/user/dashboard`;
       res.send(`<!DOCTYPE html><html><head><title>Signing you in...</title><meta http-equiv="refresh" content="0;url=${redirectUrl}"></head><body><p>Redirecting...</p></body></html>`);
-    } catch (err) { next(err); }
-  }
-);
+    } catch (dbErr) {
+      next(dbErr);
+    }
+  })(req, res, next);
+});
 
 export default router;
