@@ -224,7 +224,10 @@ router.get('/google/callback',
       await user.save();
 
       setAuthCookies(res, accessToken, refreshToken);
-      res.redirect(`${process.env.CORS_ORIGIN || 'http://localhost:5173'}/user/dashboard`);
+      const frontendUrl = process.env.NODE_ENV === 'production'
+        ? (process.env.BACKEND_URL || 'http://localhost:5000')
+        : (process.env.CORS_ORIGIN || 'http://localhost:5173');
+      res.redirect(`${frontendUrl}/user/dashboard`);
     } catch (err) { next(err); }
   }
 );
