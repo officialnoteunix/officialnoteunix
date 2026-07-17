@@ -89,7 +89,7 @@ async function startupCheck() {
   const googleConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
   check('Credentials', googleConfigured, googleConfigured ? 'configured' : 'not configured — Google sign-in disabled');
   if (googleConfigured) {
-    check('Callback URL', true, `${process.env.CORS_ORIGIN || 'http://localhost:5173'}/api/auth/google/callback`);
+    check('Callback URL', true, process.env.GOOGLE_CALLBACK_URL || `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`);
   }
 
   // ── 6. Port Availability ────────────────────────────────
