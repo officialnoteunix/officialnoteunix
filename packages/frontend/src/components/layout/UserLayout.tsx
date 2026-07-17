@@ -117,7 +117,7 @@ export default function UserLayout() {
             </button>
             <nav className="breadcrumb-nav">
               <Link to="/user/dashboard" className="breadcrumb-item">Dashboard</Link>
-              <span className="breadcrumb-separator">/</span>
+              <ChevronRight size={14} className="breadcrumb-separator" />
               <span className="breadcrumb-current">{currentPage}</span>
             </nav>
           </div>

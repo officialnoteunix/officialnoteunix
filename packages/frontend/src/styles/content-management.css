@@ -31,6 +31,9 @@
 .crumb-sep {
   color: var(--text-light);
   margin: 0 3px;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .content-form-body {
@@ -334,6 +337,19 @@
 .browse-crumb-sep {
   color: var(--text-light);
   font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bc-ellipsis {
+  display: none;
+  align-items: center;
+  color: var(--text-light);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0 2px;
+  user-select: none;
 }
 
 @media (max-width: 960px) {
@@ -360,6 +376,9 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     padding-bottom: 2px;
+  }
+  .bc-ellipsis {
+    display: inline-flex;
   }
   .browse-crumb-scroll::-webkit-scrollbar {
     height: 3px;

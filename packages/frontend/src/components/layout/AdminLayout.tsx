@@ -141,7 +141,7 @@ export default function AdminLayout() {
             </button>
             <nav className="breadcrumb-nav">
               <Link to="/admin/dashboard" className="breadcrumb-item">Admin</Link>
-              <span className="breadcrumb-separator">/</span>
+              <ChevronRight size={14} className="breadcrumb-separator" />
               <span className="breadcrumb-current">{currentPage}</span>
             </nav>
           </div>

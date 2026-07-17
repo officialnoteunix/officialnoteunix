@@ -7,7 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import { emitStatsRefresh } from '../../utils/statsRefresh';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import {
-  Building2, BookOpen, Library, BookMarked, Plus, Edit2, Trash2, Check, ChevronLeft
+  Building2, BookOpen, Library, BookMarked, Plus, Edit2, Trash2, Check, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { getApiError } from '../../utils/constants';
 
@@ -212,7 +212,7 @@ export default function Content() {
     <div>
       <div className="content-manage-header" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
         <div className="browse-crumb-scroll">
-          <div className="browse-crumb-inner">
+          <nav className="browse-crumb-inner">
             {hLevel > 0 && (
               <button onClick={handleBack} className="btn-rounded btn-ghost browse-crumb-back">
                 <ChevronLeft size={14} />
@@ -221,15 +221,28 @@ export default function Content() {
             <button onClick={resetBrowse} className="browse-crumb-link" style={{ color: browsePath.length === 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: browsePath.length === 0 ? 700 : 400 }}>
               All {currentLevel.label}
             </button>
-            {browsePath.map((item, i) => (
-              <span key={i} className="browse-crumb-item">
-                <span className="browse-crumb-sep">/</span>
-                <span style={{ color: i === browsePath.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === browsePath.length - 1 ? 700 : 400 }}>
+            {browsePath.length > 2 && (
+              <>
+                <span className="browse-crumb-sep bc-mobile-hidden"><ChevronRight size={12} /></span>
+                <span className="bc-ellipsis">
+                  <span className="browse-crumb-sep"><ChevronRight size={12} /></span>
+                  <span style={{ color: 'var(--text-light)', fontSize: 13 }}>…</span>
+                </span>
+              </>
+            )}
+            {browsePath.map((item, i) => {
+              const isLast = i === browsePath.length - 1;
+              const mobileHidden = browsePath.length > 2 && !isLast ? 'bc-mobile-hidden' : '';
+              return (
+              <span key={i} className={`browse-crumb-item ${mobileHidden}`}>
+                <span className={`browse-crumb-sep ${mobileHidden}`}><ChevronRight size={12} /></span>
+                <span style={{ color: isLast ? 'var(--primary)' : 'var(--text-muted)', fontWeight: isLast ? 700 : 400 }}>
                   {item.name}
                 </span>
               </span>
-            ))}
-          </div>
+              );
+            })}
+          </nav>
         </div>
         <button onClick={openAdd} className="btn-rounded btn-primary" style={{ padding: '8px 14px', fontSize: 12, display: 'flex', gap: 4, marginLeft: 'auto' }}>
           <Plus size={14} /> Add {currentLevel.singular}
@@ -306,11 +319,14 @@ export default function Content() {
             <button onClick={cancelForm} className="btn-rounded btn-ghost" style={{ padding: '7px 12px', flexShrink: 0, fontSize: 11, display: 'flex', gap: 4, alignItems: 'center' }}>
               <ChevronLeft size={13} /> Back
             </button>
-            <div className="content-form-breadcrumb">
+            <nav className="content-form-breadcrumb">
               {browsePath.map((item, i) => (
-                <span key={i}><span className="crumb-sep">/</span><span>{item.name}</span></span>
+                <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <ChevronRight size={11} className="crumb-sep" />
+                  <span>{item.name}</span>
+                </span>
               ))}
-            </div>
+            </nav>
           </div>
 
           <div className="content-form-body">

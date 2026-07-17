@@ -242,6 +242,13 @@
   color: var(--primary);
 }
 
+.breadcrumb-separator {
+  color: var(--text-light);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .breadcrumb-current {
   color: var(--text-main);
   font-weight: 600;
