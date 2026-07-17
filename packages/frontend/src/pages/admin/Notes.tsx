@@ -15,7 +15,7 @@ import Select from '../../components/ui/Select';
 import type { Note, PaginatedData, APIResponse } from '../../types';
 import {
   FileText, CheckCircle, XCircle, Upload, Filter, Loader2,
-  ChevronLeft, ChevronRight, Building2, BookOpen, Library, BookMarked, Edit3, Save,
+  ChevronLeft, ChevronRight, Building2, BookOpen, Library, BookMarked, Edit3, Save, Search,
 } from 'lucide-react';
 import { getApiError } from '../../utils/constants';
 
@@ -97,6 +97,7 @@ export default function Notes() {
   const [hLoading, setHLoading] = useState(false);
   const [selectedPath, setSelectedPath] = useState<{ type: string; id: string; name: string }[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [hSearch, setHSearch] = useState('');
 
   const [notePage, setNotePage] = useState(1);
   const [noteTotalPages, setNoteTotalPages] = useState(1);
@@ -151,6 +152,7 @@ export default function Notes() {
   const handleLevelClick = (item: HierarchyItem) => {
     const newPath = [...selectedPath.slice(0, hLevel), { type: hierarchySteps[hLevel].type, id: item._id, name: item.name || item.title || '' }];
     setSelectedPath(newPath);
+    setHSearch('');
     if (hLevel < 3) {
       const nl = hLevel + 1;
       setHLevel(nl);
@@ -171,6 +173,7 @@ export default function Notes() {
     if (hLevel > 0) {
       const nl = hLevel - 1;
       setHLevel(nl);
+      setHSearch('');
       const prev = selectedPath[nl - 1];
       if (prev) loadLevel(hierarchySteps[nl].type, nl >= 1 ? selectedPath[nl - 2]?.id : undefined);
     }
@@ -182,6 +185,7 @@ export default function Notes() {
       setSelectedPath(newPath);
       setHLevel(targetLevel);
       setHItems([]);
+      setHSearch('');
       loadLevel(hierarchySteps[targetLevel].type, targetLevel >= 1 ? newPath[targetLevel - 1]?.id : undefined);
     }
   };
@@ -249,6 +253,14 @@ export default function Notes() {
 
   const currentStep = hierarchySteps[hLevel];
 
+  const filteredHItems = hItems.filter(item => {
+    if (!hSearch.trim()) return true;
+    const q = hSearch.toLowerCase();
+    const name = (item.name || item.title || '').toLowerCase();
+    const code = (item.code || '').toLowerCase();
+    return name.includes(q) || code.includes(q);
+  });
+
   if (loading) return <div className="loading-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>;
 
   const renderTable = () => (
@@ -305,6 +317,7 @@ export default function Notes() {
 
   const renderSelector = () => (
     <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
         <nav className="breadcrumb" style={{ flex: 1, minWidth: 0 }}>
           {hLevel > 0 && (
             <button onClick={handleBack} className="btn-rounded btn-ghost" style={{ padding: '6px 8px', flexShrink: 0, fontSize: 12, marginRight: 4 }}>
@@ -337,14 +350,27 @@ export default function Notes() {
           })}
         </nav>
         <button onClick={cancelUpload} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, flexShrink: 0 }}>Cancel</button>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div className="search-bar" style={{ maxWidth: '100%' }}>
+          <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <input
+            type="text"
+            placeholder={`Search ${currentStep.type}...`}
+            value={hSearch}
+            onChange={e => setHSearch(e.target.value)}
+          />
+        </div>
+      </div>
 
       {hLoading ? (
         <div className="loading-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
-      ) : hItems.length === 0 ? (
+      ) : filteredHItems.length === 0 ? (
         <div className="empty-state"><currentStep.icon size={48} /><h3>No {currentStep.type} found</h3></div>
       ) : (
         <div className="hierarchy-grid">
-          {hItems.map((item, i) => {
+          {filteredHItems.map((item, i) => {
             const c = cardPalette[i % cardPalette.length];
             return (
               <button key={item._id} onClick={() => handleLevelClick(item)} className="hierarchy-card"
