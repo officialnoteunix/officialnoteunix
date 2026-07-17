@@ -16,6 +16,24 @@ process.on('uncaughtException', (err) => {
 
 const PORT = process.env.PORT || 5000;
 
+async function buildFrontendIfNeeded() {
+  const { default: fs } = await import('fs');
+  const distPath = path.resolve(__dirname, '../../frontend/dist/index.html');
+  if (fs.existsSync(distPath)) return;
+  console.log('[SPA] Frontend dist not found — building...');
+  const { execSync } = await import('child_process');
+  try {
+    execSync('npm run build -w @noteunix/frontend', {
+      cwd: path.resolve(__dirname, '../../..'),
+      stdio: 'inherit',
+      timeout: 120000,
+    });
+    console.log('[SPA] Frontend built successfully');
+  } catch (err) {
+    console.error('[SPA] Frontend build failed:', err.message);
+  }
+}
+
 function check(label, ok, detail) {
   const icon = ok ? '✓' : '✗';
   const suffix = detail ? ` — ${detail}` : '';
@@ -127,6 +145,7 @@ import { startCleanupScheduler } from './jobs/cleanup.js';
 configurePassport();
 
 async function start() {
+  await buildFrontendIfNeeded();
   await startupCheck();
 
   try {
