@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const googleLogin = async () => {
-    window.location.href = '/api/auth/google';
+    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/api/auth/google`;
     return new Promise<User>(() => {});
   };
 
