@@ -228,11 +228,7 @@ router.get('/google/callback',
         ? (process.env.BACKEND_URL || 'http://localhost:5000')
         : (process.env.CORS_ORIGIN || 'http://localhost:5173');
       const redirectUrl = `${frontendUrl}/user/dashboard`;
-      res.send(`<!DOCTYPE html><html><head><title>Signing you in...</title></head><body>
-<script>window.location.replace(${JSON.stringify(redirectUrl)})</script>
-<noscript><meta http-equiv="refresh" content="0;url=${redirectUrl}"></noscript>
-<p>Redirecting...</p>
-</body></html>`);
+      res.send(`<!DOCTYPE html><html><head><title>Signing you in...</title><meta http-equiv="refresh" content="0;url=${redirectUrl}"></head><body><p>Redirecting...</p></body></html>`);
     } catch (err) { next(err); }
   }
 );
