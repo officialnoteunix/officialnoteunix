@@ -63,7 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const googleLogin = async () => {
-    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/api/auth/google`;
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://noteunix-backend.onrender.com';
+    window.location.href = `${backendUrl}/api/auth/google`;
     return new Promise<User>(() => {});
   };
 
