@@ -5,7 +5,7 @@ export function uploadBuffer(buffer, options = {}) {
   const { folder = 'noteunix/notes', resourceType = 'auto' } = options;
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder, resourceType },
+      { folder, resource_type: resourceType },
       (err, result) => {
         if (err) {
           const e = new Error(err.message || 'Cloudinary upload failed');

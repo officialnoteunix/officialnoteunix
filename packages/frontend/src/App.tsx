@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import LoadingSpinner from './components/ui/LoadingSpinner';
+import LandingSkeleton from './components/skeletons/LandingSkeleton';
 import RateLimitBanner from './components/ui/RateLimitBanner';
 import PublicLayout from './components/layout/PublicLayout';
 import UserLayout from './components/layout/UserLayout';
@@ -62,7 +63,7 @@ export default function App() {
       <RateLimitBanner />
       <Routes>
         <Route element={<PublicLayout />}>
-          <Route path="/" element={<Landing />} />
+          <Route path="/" element={<Suspense fallback={<LandingSkeleton />}><Landing /></Suspense>} />
           <Route path="/notes" element={<Browse />} />
           <Route path="/notes/:id" element={<NoteDetail />} />
           <Route path="/universities/:id" element={<UniversityDetail />} />
