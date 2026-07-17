@@ -1,10 +1,10 @@
 const SITE_URL = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const SITE_NAME = 'NoteUniX';
+const SITE_NAME = process.env.SITE_NAME || 'NoteUniX';
 const BREVO_API = 'https://api.brevo.com/v3/smtp/email';
 
 // ── Provider detection ──────────────────────────────────────────────
 export function isEmailEnabled() {
-  return !!process.env.BREVO_API_KEY;
+  return !!(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL);
 }
 
 // ── Retry info (rate limit resets midnight Pacific) ─────────────────
@@ -21,17 +21,17 @@ export function getEmailRetryInfo() {
 
 // ── Startup verification ────────────────────────────────────────────
 export async function verifySmtp() {
-  if (!process.env.BREVO_API_KEY) {
-    console.warn('[EMAIL] BREVO_API_KEY not set — emails disabled');
+  if (!process.env.BREVO_API_KEY || !process.env.BREVO_SENDER_EMAIL) {
+    console.warn('[EMAIL] BREVO_API_KEY or BREVO_SENDER_EMAIL not set — emails disabled');
     return false;
   }
-  console.log('[EMAIL] Brevo API key configured');
+  console.log('[EMAIL] Brevo API configured');
   return true;
 }
 
 // ── Brevo REST API send ─────────────────────────────────────────────
 function getSenderEmail() {
-  return process.env.BREVO_SENDER_EMAIL || 'officialnoteunix@gmail.com';
+  return process.env.BREVO_SENDER_EMAIL;
 }
 
 function getSenderName() {
