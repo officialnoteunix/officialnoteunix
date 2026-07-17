@@ -15,7 +15,7 @@ import Select from '../../components/ui/Select';
 import type { Note, PaginatedData, APIResponse } from '../../types';
 import {
   FileText, CheckCircle, XCircle, Upload, Filter, Loader2,
-  ChevronLeft, Building2, BookOpen, Library, BookMarked, Edit3, Save,
+  ChevronLeft, ChevronRight, Building2, BookOpen, Library, BookMarked, Edit3, Save,
 } from 'lucide-react';
 import { getApiError } from '../../utils/constants';
 
@@ -176,6 +176,16 @@ export default function Notes() {
     }
   };
 
+  const goToLevel = (targetLevel: number) => {
+    if (targetLevel < hLevel) {
+      const newPath = selectedPath.slice(0, targetLevel);
+      setSelectedPath(newPath);
+      setHLevel(targetLevel);
+      setHItems([]);
+      loadLevel(hierarchySteps[targetLevel].type, targetLevel >= 1 ? newPath[targetLevel - 1]?.id : undefined);
+    }
+  };
+
   const cancelUpload = () => {
     setView('table'); setSelectedPath([]); setSelectedSubjectId('');
     setUploadTitle(''); setUploadDesc(''); setUploadResourceType('study_notes'); setFiles([]);
@@ -295,28 +305,38 @@ export default function Notes() {
 
   const renderSelector = () => (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+        <nav className="breadcrumb" style={{ flex: 1, minWidth: 0 }}>
           {hLevel > 0 && (
-            <button onClick={handleBack} className="btn-rounded btn-ghost" style={{ padding: '8px 12px', flexShrink: 0, fontSize: 12, marginRight: 4 }}>
+            <button onClick={handleBack} className="btn-rounded btn-ghost" style={{ padding: '6px 8px', flexShrink: 0, fontSize: 12, marginRight: 4 }}>
               <ChevronLeft size={14} />
             </button>
           )}
-          <button onClick={cancelUpload}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: selectedPath.length === 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: selectedPath.length === 0 ? 700 : 400, padding: 0, fontSize: 13 }}>
+          <button onClick={cancelUpload} className={`bc-item-btn ${selectedPath.length === 0 ? 'bc-active' : ''}`}>
             All {currentStep.type}
           </button>
-          {selectedPath.map((item, i) => (
-            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>
-              <span style={{ color: i === selectedPath.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === selectedPath.length - 1 ? 700 : 400 }}>
-                {item.name}
+          {selectedPath.length > 2 && (
+            <>
+              <span className="bc-sep bc-mobile-hidden"><ChevronRight size={12} /></span>
+              <span className="bc-ellipsis">
+                <span className="bc-sep"><ChevronRight size={12} /></span>
+                <span style={{ color: 'var(--text-light)', fontSize: 13 }}>…</span>
               </span>
-            </span>
-          ))}
-        </div>
+            </>
+          )}
+          {selectedPath.map((item, i) => {
+            const isLast = i === selectedPath.length - 1;
+            const mobileHidden = selectedPath.length > 2 && !isLast ? 'bc-mobile-hidden' : '';
+            return (
+              <span key={i} className={mobileHidden} style={{ display: 'flex', alignItems: 'center' }}>
+                <span className={`bc-sep ${mobileHidden}`}><ChevronRight size={12} /></span>
+                <button onClick={() => goToLevel(i + 1)} className={`bc-item-btn ${isLast ? 'bc-active' : ''}`}>
+                  {item.name}
+                </button>
+              </span>
+            );
+          })}
+        </nav>
         <button onClick={cancelUpload} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, marginLeft: 'auto' }}>Cancel</button>
-      </div>
 
       {hLoading ? (
         <div className="loading-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
@@ -344,20 +364,23 @@ export default function Notes() {
 
   const renderUploadForm = () => (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-          <button onClick={goBackToSelect} className="btn-rounded btn-ghost" style={{ padding: '8px 12px', flexShrink: 0, fontSize: 12, marginRight: 4 }}>
+        <nav className="breadcrumb" style={{ flex: 1, minWidth: 0 }}>
+          <button onClick={goBackToSelect} className="btn-rounded btn-ghost" style={{ padding: '6px 8px', flexShrink: 0, fontSize: 12, marginRight: 4 }}>
             <ChevronLeft size={14} />
           </button>
-          {selectedPath.map((item, i) => (
-            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>
-              <span style={{ color: i === selectedPath.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === selectedPath.length - 1 ? 700 : 400 }}>{item.name}</span>
-            </span>
-          ))}
-        </div>
+          {selectedPath.map((item, i) => {
+            const isLast = i === selectedPath.length - 1;
+            return (
+              <span key={i} style={{ display: 'flex', alignItems: 'center' }}>
+                {i > 0 && <span className="bc-sep"><ChevronRight size={12} /></span>}
+                <span className={`bc-item-btn ${isLast ? 'bc-active' : ''}`} style={{ cursor: 'default' }}>
+                  {item.name}
+                </span>
+              </span>
+            );
+          })}
+        </nav>
         <button onClick={cancelUpload} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, marginLeft: 'auto' }}>Cancel</button>
-      </div>
 
       <form onSubmit={handleUpload} autoComplete="off">
         <div className="upload-h-row">
