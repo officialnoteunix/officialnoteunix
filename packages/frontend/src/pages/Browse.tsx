@@ -187,6 +187,12 @@ export default function Browse() {
     setHierarchy([]);
   };
 
+  const goToLevel = (index: number) => {
+    setSearch('');
+    setPage(1);
+    setHierarchy(prev => prev.slice(0, index));
+  };
+
   const levelLabel = level === 'universities' ? 'Universities'
     : level === 'courses' ? 'Courses'
     : level === 'semesters' ? 'Semesters'
@@ -213,26 +219,31 @@ export default function Browse() {
             </button>
           )}
           <div className="breadcrumb">
-            <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer', color: hierarchy.length === 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: hierarchy.length === 0 ? 700 : 400, padding: 0, fontSize: 13 }}>
-              All {levelLabel}
+            <button onClick={reset} className="bc-item-btn bc-root-btn" style={{ background: 'none', border: 'none', cursor: 'pointer', color: hierarchy.length === 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: hierarchy.length === 0 ? 700 : 400, padding: 0, fontSize: 13 }}>
+              All Notes
             </button>
-            {hierarchy.map((item, i) => (
-              <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>
-                <span style={{ color: i === hierarchy.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === hierarchy.length - 1 ? 700 : 400 }}>
+            {hierarchy.map((item, i) => {
+              const isLastTwo = i >= hierarchy.length - 2;
+              return (
+              <span key={i} className={isLastTwo ? '' : 'bc-mobile-hidden'} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="bc-sep" style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>
+                <button onClick={() => goToLevel(i + 1)} className="bc-item-btn" style={{ background: 'none', border: 'none', cursor: 'pointer', color: i === hierarchy.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === hierarchy.length - 1 ? 700 : 400, padding: 0, fontSize: 13, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
                   {item.name}
-                </span>
+                </button>
               </span>
-            ))}
+              );
+            })}
           </div>
         </div>
         <div className="filter-search-row">
-          <Select
-            value={resourceTypeFilter}
-            onChange={(val) => { setResourceTypeFilter(val); setPage(1); }}
-            options={RESOURCE_TYPES}
-            icon={<Filter size={14} />}
-          />
+          {level === 'notes' && (
+            <Select
+              value={resourceTypeFilter}
+              onChange={(val) => { setResourceTypeFilter(val); setPage(1); }}
+              options={RESOURCE_TYPES}
+              icon={<Filter size={14} />}
+            />
+          )}
           <div className="search-bar">
             <Search size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <input

@@ -7,7 +7,7 @@ import { semesterApi } from '../../api/semester';
 import { subjectApi } from '../../api/subject';
 import { useToast } from '../../context/ToastContext';
 import { getApiError } from '../../utils/constants';
-import { Upload as UploadIcon, ChevronLeft, Building2, BookOpen, Library, BookMarked, Loader2, XCircle } from 'lucide-react';
+import { Upload as UploadIcon, ChevronLeft, Building2, BookOpen, Library, BookMarked, Loader2, XCircle, Search } from 'lucide-react';
 import FileTypePlaceholder from '../../components/ui/FileTypePlaceholder';
 import Select from '../../components/ui/Select';
 import SEO from '../../components/seo/SEO';
@@ -69,6 +69,7 @@ export default function Upload() {
   const [hLoading, setHLoading] = useState(false);
   const [selectedPath, setSelectedPath] = useState<{ type: string; id: string; name: string }[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [hSearch, setHSearch] = useState('');
 
   const loadLevel = useCallback((type: string, parentId?: string) => {
     setHLoading(true);
@@ -92,6 +93,7 @@ export default function Upload() {
     const step = hierarchySteps[hLevel];
     const newPath = [...selectedPath.slice(0, hLevel), { type: step.type, id: item._id, name: item.name || item.title || '' }];
     setSelectedPath(newPath);
+    setHSearch('');
 
     if (hLevel < 3) {
       const nextLevel = hLevel + 1;
@@ -110,6 +112,7 @@ export default function Upload() {
     if (hLevel > 0) {
       const newLevel = hLevel - 1;
       setHLevel(newLevel);
+      setHSearch('');
       const prevPath = selectedPath[newLevel - 1];
       if (prevPath) {
         loadLevel(hierarchySteps[newLevel].type, newLevel >= 1 ? selectedPath[newLevel - 2]?.id : undefined);
@@ -121,6 +124,25 @@ export default function Upload() {
     setTitle(''); setDescription(''); setResourceType('study_notes'); setFiles([]);
     setView('select'); setHLevel(3);
   };
+
+  const goToLevel = (targetLevel: number) => {
+    if (targetLevel < hLevel) {
+      const newPath = selectedPath.slice(0, targetLevel);
+      setSelectedPath(newPath);
+      setHLevel(targetLevel);
+      setHItems([]);
+      setHSearch('');
+      loadLevel(hierarchySteps[targetLevel].type, targetLevel >= 1 ? newPath[targetLevel - 1]?.id : undefined);
+    }
+  };
+
+  const filteredHItems = hItems.filter(item => {
+    if (!hSearch.trim()) return true;
+    const q = hSearch.toLowerCase();
+    const name = (item.name || item.title || '').toLowerCase();
+    const code = (item.code || '').toLowerCase();
+    return name.includes(q) || code.includes(q);
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,36 +173,50 @@ export default function Upload() {
 
   const renderSelector = () => (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div className="breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, flex: 1, minWidth: 0 }}>
           {hLevel > 0 && (
-            <button onClick={handleBack} className="btn-rounded btn-ghost" style={{ padding: '8px 12px', flexShrink: 0, fontSize: 12, marginRight: 4 }}>
+            <button onClick={handleBack} className="btn-rounded btn-ghost bc-item-btn" style={{ padding: '6px 8px', flexShrink: 0, fontSize: 12 }}>
               <ChevronLeft size={14} />
             </button>
           )}
-          <button onClick={() => navigate('/user/my-notes')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: selectedPath.length === 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: selectedPath.length === 0 ? 700 : 400, padding: 0, fontSize: 13 }}>
-            All {currentStep.type}
+          <button onClick={() => navigate('/user/my-notes')} className="bc-item-btn bc-root-btn" style={{ background: 'none', border: 'none', cursor: 'pointer', color: selectedPath.length === 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: selectedPath.length === 0 ? 700 : 400, padding: 0, fontSize: 13 }}>
+            All Notes
           </button>
-          {selectedPath.map((item, i) => (
-            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>
-              <span style={{ color: i === selectedPath.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === selectedPath.length - 1 ? 700 : 400 }}>
+          {selectedPath.map((item, i) => {
+            const isLastTwo = i >= selectedPath.length - 2;
+            return (
+            <span key={i} className={isLastTwo ? '' : 'bc-mobile-hidden'} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="bc-sep" style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>
+              <button onClick={() => goToLevel(i + 1)} className="bc-item-btn" style={{ background: 'none', border: 'none', cursor: 'pointer', color: i === selectedPath.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === selectedPath.length - 1 ? 700 : 400, padding: 0, fontSize: 13, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
                 {item.name}
-              </span>
+              </button>
             </span>
-          ))}
+            );
+          })}
         </div>
-        <button onClick={() => navigate('/user/my-notes')} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, marginLeft: 'auto' }}>Cancel</button>
+        <button onClick={() => navigate('/user/my-notes')} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, flexShrink: 0 }}>Cancel</button>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div className="search-bar" style={{ maxWidth: '100%' }}>
+          <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <input
+            type="text"
+            placeholder={`Search ${currentStep.type}...`}
+            value={hSearch}
+            onChange={e => setHSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       {hLoading ? (
         <div className="loading-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
-      ) : hItems.length === 0 ? (
+      ) : filteredHItems.length === 0 ? (
         <div className="empty-state"><currentStep.icon size={48} /><h3>No {currentStep.type} found</h3></div>
       ) : (
         <div className="hierarchy-grid">
-          {hItems.map((item, i) => {
+          {filteredHItems.map((item, i) => {
             const c = cardPalette[i % cardPalette.length];
             return (
               <button key={item._id} onClick={() => handleLevelClick(item)} className="hierarchy-card"
@@ -201,18 +237,20 @@ export default function Upload() {
   const renderUploadForm = () => (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-          <button onClick={goBackToSelect} className="btn-rounded btn-ghost" style={{ padding: '8px 12px', flexShrink: 0, fontSize: 12, marginRight: 4 }}>
+        <div className="breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, flex: 1, minWidth: 0 }}>
+          <button onClick={goBackToSelect} className="btn-rounded btn-ghost bc-item-btn" style={{ padding: '6px 8px', flexShrink: 0, fontSize: 12 }}>
             <ChevronLeft size={14} />
           </button>
           {selectedPath.map((item, i) => (
-            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>
-              <span style={{ color: i === selectedPath.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === selectedPath.length - 1 ? 700 : 400 }}>{item.name}</span>
+            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {i > 0 && <span className="bc-sep" style={{ color: 'var(--text-light)', fontSize: 13 }}>/</span>}
+              <span className="bc-item-btn" style={{ color: i === selectedPath.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === selectedPath.length - 1 ? 700 : 400, fontSize: 13, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {item.name}
+              </span>
             </span>
           ))}
         </div>
-        <button onClick={() => navigate('/user/my-notes')} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, marginLeft: 'auto' }}>Cancel</button>
+        <button onClick={() => navigate('/user/my-notes')} className="btn-rounded btn-ghost" style={{ padding: '8px 14px', fontSize: 12, flexShrink: 0 }}>Cancel</button>
       </div>
 
       <form onSubmit={handleSubmit} autoComplete="off">
