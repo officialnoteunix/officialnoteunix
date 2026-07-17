@@ -224,9 +224,10 @@ router.get('/google/callback',
       await user.save();
 
       setAuthCookies(res, accessToken, refreshToken);
-      const frontendUrl = process.env.NODE_ENV === 'production'
+      let frontendUrl = process.env.NODE_ENV === 'production'
         ? (process.env.BACKEND_URL || 'http://localhost:5000')
         : (process.env.CORS_ORIGIN || 'http://localhost:5173');
+      frontendUrl = frontendUrl.replace(/\/api\/?$/, '');
       const redirectUrl = `${frontendUrl}/user/dashboard`;
       res.send(`<!DOCTYPE html><html><head><title>Signing you in...</title><meta http-equiv="refresh" content="0;url=${redirectUrl}"></head><body><p>Redirecting...</p></body></html>`);
     } catch (err) { next(err); }
