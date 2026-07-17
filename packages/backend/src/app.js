@@ -58,6 +58,11 @@ function createRateLimiter(windowMs, max) {
 app.use('/api/auth', createRateLimiter(60 * 1000, 30));
 app.use('/api', createRateLimiter(60 * 1000, 250));
 
+const distPath = path.resolve(__dirname, '../../frontend/dist');
+const fs = await import('fs');
+const indexExists = fs.existsSync(path.join(distPath, 'index.html'));
+console.log(`[SPA] distPath: ${distPath}, index.html exists: ${indexExists}`);
+
 if (process.env.NODE_ENV !== 'production') {
   app.post('/api/debug/test-email', express.json(), async (req, res) => {
     try {
@@ -95,16 +100,22 @@ app.get('/api/health', (req, res) => {
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     database: dbStatus[dbState] || 'unknown',
+    distPath: distPath,
+    indexExists: indexExists,
+    nodeEnv: process.env.NODE_ENV,
   });
 });
 
 app.use('/api', routes);
 
-const distPath = path.resolve(__dirname, '../../frontend/dist');
-app.use(express.static(distPath));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
-});
+if (indexExists) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else {
+  console.warn('[SPA] dist/index.html not found — SPA routes will 404');
+}
 
 app.use(errorHandler);
 
