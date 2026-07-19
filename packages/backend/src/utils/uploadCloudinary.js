@@ -5,11 +5,10 @@ import { compressImageBuffer, makeThumbnailBuffer, isProcessableImage } from './
 export function uploadBuffer(buffer, options = {}) {
   const { folder = 'noteunix/notes', resourceType = 'auto', transformation } = options;
   const uploadOptions = { folder, resource_type: resourceType };
-  // Cloudinary auto-optimization: serve modern format + auto quality.
-  if (resourceType === 'auto' || resourceType === 'image') {
-    uploadOptions.format = 'auto';
-    uploadOptions.quality = 'auto';
-  }
+  // NOTE: `format`/`quality` are delivery (transformation) params, not valid as
+  // raw upload options. Passing `format: 'auto'` on upload (esp. for PDF/raw files
+  // with resource_type 'auto') causes "Invalid extension in transformation: auto".
+  // Optimization (f_auto,q_auto) is applied at delivery time via the URL instead.
   if (transformation) uploadOptions.transformation = transformation;
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -30,6 +29,14 @@ export function uploadBuffer(buffer, options = {}) {
     });
     stream.end(buffer);
   });
+}
+
+// Append Cloudinary auto-optimization segments (f_auto,q_auto) to an image delivery URL.
+// Only safe for image resources; raw (PDF/doc) URLs are returned unchanged.
+export function optimizeImageUrl(url) {
+  if (!url || !/image\/upload\//.test(url)) return url;
+  if (url.includes('/upload/f_auto')) return url;
+  return url.replace('/upload/', '/upload/f_auto,q_auto/');
 }
 
 export async function uploadFiles(uploadedFiles, folder = 'noteunix/notes') {
@@ -58,7 +65,7 @@ export async function uploadFiles(uploadedFiles, folder = 'noteunix/notes') {
     }
     const result = await uploadBuffer(buffer, { folder, resourceType: isImage ? 'auto' : 'raw' });
     return {
-      url: result.secure_url,
+      url: isImage ? optimizeImageUrl(result.secure_url) : result.secure_url,
       fileType,
       fileSize: size,
       publicId: result.public_id || '',
