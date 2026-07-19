@@ -8,7 +8,7 @@ import Rating from '../models/Rating.js';
 import Report from '../models/Report.js';
 import Notification from '../models/Notification.js';
 import { authenticate, optionalAuth } from '../middleware/auth.js';
-import { validate } from '../middleware/validate.js';
+import { validate, sanitizeTextFields } from '../middleware/validate.js';
 import { upload, validatePdfBuffer } from '../middleware/upload.js';
 import { createNoteSchema, updateNoteSchema } from '../validators/noteValidator.js';
 import { escapeRegex } from '../utils/escapeRegex.js';
@@ -164,7 +164,7 @@ router.get('/:id/share', async (req, res, next) => {
 router.post('/', authenticate, upload.fields([
   { name: 'files', maxCount: 10 },
   { name: 'thumbnail', maxCount: 1 },
-]), validate(createNoteSchema), async (req, res, next) => {
+]), sanitizeTextFields('title', 'description'), validate(createNoteSchema), async (req, res, next) => {
   try {
     const uploaded = req.files?.files || [];
     if (!uploaded.length) {
@@ -242,11 +242,11 @@ router.patch('/:id', authenticate, (req, res, next) => {
   } else {
     next();
   }
-}, validate(updateNoteSchema), async (req, res, next) => {
+}, sanitizeTextFields('title', 'description'), validate(updateNoteSchema), async (req, res, next) => {
   try {
     const note = await Note.findById(req.params.id);
     if (!note) return res.status(404).json({ success: false, message: 'Not found' });
-    if (note.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (note.userId.toString() !== req.user._id.toString() && !req.user.hasPermission('note:moderate')) {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
     const updates = { ...req.validatedBody };
@@ -337,7 +337,7 @@ router.delete('/:id', authenticate, async (req, res, next) => {
   try {
     const note = await Note.findById(req.params.id);
     if (!note) return res.status(404).json({ success: false, message: 'Not found' });
-    if (note.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (note.userId.toString() !== req.user._id.toString() && !req.user.hasPermission('note:moderate')) {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
     await Promise.all([

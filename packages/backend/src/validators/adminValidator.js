@@ -1,4 +1,23 @@
 import { z } from 'zod';
+import { ALL_ROLES, PERMISSIONS, ADMIN_ONLY_PERMISSIONS } from '../utils/constants.js';
+
+const ALL_PERMISSION_VALUES = Object.values(PERMISSIONS);
+
+export const setRoleSchema = z.object({
+  role: z.enum(ALL_ROLES),
+  permissions: z.array(z.enum(ALL_PERMISSION_VALUES)).optional().default([]),
+}).superRefine((val, ctx) => {
+  if (val.role === 'maintainer') {
+    const invalid = val.permissions.filter(p => ADMIN_ONLY_PERMISSIONS.includes(p));
+    if (invalid.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['permissions'],
+        message: `Cannot grant admin-only permissions to a maintainer: ${invalid.join(', ')}`,
+      });
+    }
+  }
+});
 
 export const createContentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200),

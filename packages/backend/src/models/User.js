@@ -1,11 +1,23 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
+import { DEFAULT_MAINTAINER_PERMISSIONS, ADMIN_ONLY_PERMISSIONS, ROLES } from '../utils/constants.js';
 
 const userSchema = new mongoose.Schema({
   fullname: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   passwordHash: { type: String, default: '' },
-  role: { type: String, enum: ['student', 'admin'], default: 'student' },
+  role: { type: String, enum: ['student', 'maintainer', 'admin'], default: 'student' },
+  permissions: {
+    type: [String],
+    default: undefined,
+    validate: {
+      validator: function (vals) {
+        if (!Array.isArray(vals)) return true;
+        return vals.every(v => !ADMIN_ONLY_PERMISSIONS.includes(v));
+      },
+      message: 'Maintainer permissions cannot include admin-only permissions',
+    },
+  },
   avatar: { type: String, default: null },
   isVerified: { type: Boolean, default: false },
   banned: { type: Boolean, default: false },
@@ -29,6 +41,7 @@ userSchema.methods.toPublicJSON = function () {
     fullname: this.fullname,
     email: this.email,
     role: this.role,
+    permissions: this.permissions || [],
     avatar: this.avatar,
     isVerified: this.isVerified,
     banned: this.banned,
@@ -36,6 +49,14 @@ userSchema.methods.toPublicJSON = function () {
     emailVerified: this.emailVerified,
     createdAt: this.createdAt,
   };
+};
+
+// Admins implicitly hold every permission. Maintainers hold only what is assigned.
+userSchema.methods.hasPermission = function (permission) {
+  if (this.role === ROLES.ADMIN) return true;
+  if (this.role === ROLES.STUDENT) return false;
+  const perms = this.permissions || [];
+  return perms.includes(permission);
 };
 
 userSchema.methods.clearSuspension = function () {

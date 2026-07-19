@@ -2,11 +2,12 @@ import { Router } from 'express';
 import Note from '../models/Note.js';
 import User from '../models/User.js';
 import Ad from '../models/Ad.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { authenticate, authorize, authorizePermission } from '../middleware/auth.js';
+import { PERMISSIONS } from '../utils/constants.js';
 
 const router = Router();
 
-router.get('/overview', authenticate, authorize('admin'), async (req, res, next) => {
+router.get('/overview', authenticate, authorizePermission(PERMISSIONS.ANALYTICS_VIEW), async (req, res, next) => {
   try {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);

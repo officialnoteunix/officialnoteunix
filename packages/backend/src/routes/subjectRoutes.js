@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import Subject from '../models/Subject.js';
 import Note from '../models/Note.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { authenticate, authorize, authorizePermission } from '../middleware/auth.js';
 import { escapeRegex } from '../utils/escapeRegex.js';
-import { safeLimit, safePage } from '../utils/constants.js';
+import { safeLimit, safePage, PERMISSIONS } from '../utils/constants.js';
 import { validate } from '../middleware/validate.js';
 import { createContentSchema, updateContentSchema } from '../validators/adminValidator.js';
 import { cascadeDeleteSubject } from '../utils/cascadeDelete.js';
@@ -55,14 +55,14 @@ router.get('/:id/notes', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', authenticate, authorize('admin'), validate(createContentSchema), async (req, res, next) => {
+router.post('/', authenticate, authorizePermission(PERMISSIONS.TAXONOMY_EDIT), validate(createContentSchema), async (req, res, next) => {
   try {
     const subject = await Subject.create(req.validatedBody);
     res.status(201).json({ success: true, data: subject });
   } catch (err) { next(err); }
 });
 
-router.patch('/:id', authenticate, authorize('admin'), validate(updateContentSchema), async (req, res, next) => {
+router.patch('/:id', authenticate, authorizePermission(PERMISSIONS.TAXONOMY_EDIT), validate(updateContentSchema), async (req, res, next) => {
   try {
     const subject = await Subject.findByIdAndUpdate(req.params.id, req.validatedBody, { new: true });
     if (!subject) return res.status(404).json({ success: false, message: 'Not found' });

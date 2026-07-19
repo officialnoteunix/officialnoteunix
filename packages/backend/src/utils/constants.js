@@ -1,7 +1,49 @@
 export const ROLES = {
   STUDENT: 'student',
+  MAINTAINER: 'maintainer',
   ADMIN: 'admin',
 };
+
+export const ALL_ROLES = [ROLES.STUDENT, ROLES.MAINTAINER, ROLES.ADMIN];
+
+// Permission keys. Admin implicitly has all; maintainer gets a subset chosen by admin.
+export const PERMISSIONS = {
+  NOTE_MODERATE: 'note:moderate',       // approve/reject/edit/delete any note
+  COMMENT_MODERATE: 'comment:moderate', // list/delete any comment
+  REPORT_MANAGE: 'report:manage',       // view/resolve/dismiss reports
+  CONTACT_MANAGE: 'contact:manage',     // view/read/reply/delete contact messages
+  NOTE_CREATE: 'note:create',           // create notes on behalf of the platform
+  ANALYTICS_VIEW: 'analytics:view',     // view dashboards
+  TAXONOMY_EDIT: 'taxonomy:edit',        // create/edit university/course/semester/subject
+  AD_MANAGE: 'ad:manage',               // create/edit ads
+};
+
+// Default permission set granted to a maintainer on promotion (admin can customize).
+export const DEFAULT_MAINTAINER_PERMISSIONS = [
+  PERMISSIONS.NOTE_MODERATE,
+  PERMISSIONS.COMMENT_MODERATE,
+  PERMISSIONS.REPORT_MANAGE,
+  PERMISSIONS.CONTACT_MANAGE,
+  PERMISSIONS.NOTE_CREATE,
+  PERMISSIONS.ANALYTICS_VIEW,
+  PERMISSIONS.TAXONOMY_EDIT,
+  PERMISSIONS.AD_MANAGE,
+];
+
+// Permissions that must NEVER be granted to a maintainer (reserved for admin only).
+export const ADMIN_ONLY_PERMISSIONS = [
+  'user:ban',
+  'user:delete',
+  'user:verify',
+  'email:broadcast',
+  'audit:view',
+  'taxonomy:delete',
+  'ad:delete',
+];
+
+export function isAdmin(role) {
+  return role === ROLES.ADMIN;
+}
 
 export const FILE_TYPES = {
   PDF: 'application/pdf',

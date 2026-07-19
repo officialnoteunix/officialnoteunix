@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import Report from '../models/Report.js';
-import { authenticate, authorize } from '../middleware/auth.js';
-import { safeLimit, safePage } from '../utils/constants.js';
+import { authenticate, authorize, authorizePermission } from '../middleware/auth.js';
+import { safeLimit, safePage, PERMISSIONS } from '../utils/constants.js';
+import { sanitizeText } from '../utils/sanitize.js';
 import { logAudit } from '../services/auditLogger.js';
 
 const router = Router();
 
-router.get('/', authenticate, authorize('admin'), async (req, res, next) => {
+router.get('/', authenticate, authorizePermission(PERMISSIONS.REPORT_MANAGE), async (req, res, next) => {
   try {
     const { status, type, page = 1, limit = 5 } = req.query;
     const safeLim = safeLimit(limit);
@@ -65,13 +66,13 @@ router.post('/', authenticate, async (req, res, next) => {
       note: noteId,
       reportedBy: req.user._id,
       type,
-      reason,
+      reason: sanitizeText(reason),
     });
     res.status(201).json({ success: true, data: report });
   } catch (err) { next(err); }
 });
 
-router.patch('/:id/status', authenticate, authorize('admin'), async (req, res, next) => {
+router.patch('/:id/status', authenticate, authorizePermission(PERMISSIONS.REPORT_MANAGE), async (req, res, next) => {
   try {
     const { status } = req.body;
     if (!['resolved', 'dismissed'].includes(status)) {

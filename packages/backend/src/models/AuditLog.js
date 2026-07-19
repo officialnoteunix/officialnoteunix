@@ -13,6 +13,7 @@ const auditLogSchema = new mongoose.Schema({
       'report_resolve', 'report_dismiss',
       'send_email', 'ad_create', 'ad_update', 'ad_delete',
       'content_create', 'content_update', 'content_delete',
+      'user_role_change',
     ],
     required: true,
   },

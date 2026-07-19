@@ -12,18 +12,20 @@ import ContactMessage from '../models/ContactMessage.js';
 import Comment from '../models/Comment.js';
 import Notification from '../models/Notification.js';
 import AuditLog from '../models/AuditLog.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { authenticate, authorize, authorizePermission } from '../middleware/auth.js';
 import { sendCustomEmail, isEmailEnabled, getEmailRetryInfo } from '../config/email.js';
-import { validate } from '../middleware/validate.js';
+import { validate, sanitizeTextFields } from '../middleware/validate.js';
+import { sanitizeRichHtml } from '../utils/sanitize.js';
 import { upload, validatePdfBuffer } from '../middleware/upload.js';
 import { createNoteSchema, updateNoteSchema } from '../validators/noteValidator.js';
-import { safeLimit, safePage } from '../utils/constants.js';
+import { safeLimit, safePage, ROLES, DEFAULT_MAINTAINER_PERMISSIONS, PERMISSIONS, ADMIN_ONLY_PERMISSIONS } from '../utils/constants.js';
+import { setRoleSchema } from '../validators/adminValidator.js';
 import { uploadFiles, uploadThumbnail, deleteFile, deleteNoteFiles, extractPublicId } from '../utils/uploadCloudinary.js';
 import { logAudit } from '../services/auditLogger.js';
 
 const router = Router();
 
-router.get('/stats', authenticate, authorize('admin'), async (req, res, next) => {
+router.get('/stats', authenticate, authorizePermission(PERMISSIONS.ANALYTICS_VIEW), async (req, res, next) => {
   try {
     const [
       totalUsers, totalNotes, totalUniversities, totalCourses, totalSemesters, totalSubjects,
@@ -122,7 +124,7 @@ router.get('/users/:id', authenticate, authorize('admin'), async (req, res, next
   } catch (err) { next(err); }
 });
 
-router.get('/notes', authenticate, authorize('admin'), async (req, res, next) => {
+router.get('/notes', authenticate, authorizePermission(PERMISSIONS.NOTE_MODERATE), async (req, res, next) => {
   try {
     const { approved, page = 1, limit = 5 } = req.query;
     const safeLim = safeLimit(limit);
@@ -143,10 +145,10 @@ router.get('/notes', authenticate, authorize('admin'), async (req, res, next) =>
   } catch (err) { next(err); }
 });
 
-router.post('/notes', authenticate, authorize('admin'), upload.fields([
+router.post('/notes', authenticate, authorizePermission(PERMISSIONS.NOTE_CREATE), upload.fields([
   { name: 'files', maxCount: 10 },
   { name: 'thumbnail', maxCount: 1 },
-]), validate(createNoteSchema), async (req, res, next) => {
+]), sanitizeTextFields('title', 'description'), validate(createNoteSchema), async (req, res, next) => {
   try {
     const uploaded = req.files?.files || [];
     if (!uploaded.length) return res.status(400).json({ success: false, message: 'At least one file is required' });
@@ -203,7 +205,7 @@ router.post('/notes', authenticate, authorize('admin'), upload.fields([
   } catch (err) { next(err); }
 });
 
-router.patch('/notes/:id', authenticate, authorize('admin'), (req, res, next) => {
+router.patch('/notes/:id', authenticate, authorizePermission(PERMISSIONS.NOTE_MODERATE), (req, res, next) => {
   if (req.is('multipart/form-data')) {
     upload.fields([
       { name: 'files', maxCount: 10 },
@@ -215,7 +217,7 @@ router.patch('/notes/:id', authenticate, authorize('admin'), (req, res, next) =>
   } else {
     next();
   }
-}, validate(updateNoteSchema), async (req, res, next) => {
+}, sanitizeTextFields('title', 'description'), validate(updateNoteSchema), async (req, res, next) => {
   try {
     const note = await Note.findById(req.params.id);
     if (!note) return res.status(404).json({ success: false, message: 'Not found' });
@@ -262,7 +264,7 @@ router.patch('/notes/:id', authenticate, authorize('admin'), (req, res, next) =>
   } catch (err) { next(err); }
 });
 
-router.patch('/notes/:id/approve', authenticate, authorize('admin'), async (req, res, next) => {
+router.patch('/notes/:id/approve', authenticate, authorizePermission(PERMISSIONS.NOTE_MODERATE), async (req, res, next) => {
   try {
     const note = await Note.findByIdAndUpdate(req.params.id, { approved: true }, { new: true }).populate('userId', 'fullname email');
     if (!note) return res.status(404).json({ success: false, message: 'Not found' });
@@ -283,7 +285,7 @@ router.patch('/notes/:id/approve', authenticate, authorize('admin'), async (req,
   } catch (err) { next(err); }
 });
 
-router.patch('/notes/:id/reject', authenticate, authorize('admin'), async (req, res, next) => {
+router.patch('/notes/:id/reject', authenticate, authorizePermission(PERMISSIONS.NOTE_MODERATE), async (req, res, next) => {
   try {
     const note = await Note.findByIdAndUpdate(req.params.id, { approved: false }, { new: true }).populate('userId', 'fullname email');
     if (!note) return res.status(404).json({ success: false, message: 'Not found' });
@@ -304,7 +306,7 @@ router.patch('/notes/:id/reject', authenticate, authorize('admin'), async (req, 
   } catch (err) { next(err); }
 });
 
-router.delete('/notes/:id', authenticate, authorize('admin'), async (req, res, next) => {
+router.delete('/notes/:id', authenticate, authorizePermission(PERMISSIONS.NOTE_MODERATE), async (req, res, next) => {
   try {
     const note = await Note.findById(req.params.id);
     if (!note) return res.status(404).json({ success: false, message: 'Not found' });
@@ -411,7 +413,59 @@ router.delete('/users/:id', authenticate, authorize('admin'), async (req, res, n
   } catch (err) { next(err); }
 });
 
-router.get('/comments', authenticate, authorize('admin'), async (req, res, next) => {
+// Promote / demote a user and (for maintainers) set their permission scope.
+// Admin-only. Admins cannot change their own role.
+router.patch('/users/:id/role', authenticate, authorize('admin'), validate(setRoleSchema), async (req, res, next) => {
+  try {
+    const target = await User.findById(req.params.id);
+    if (!target) return res.status(404).json({ success: false, message: 'Not found' });
+    if (req.user._id.equals(target._id)) {
+      return res.status(400).json({ success: false, message: 'You cannot change your own role' });
+    }
+
+    const { role, permissions } = req.validatedBody;
+
+    if (role === ROLES.ADMIN) {
+      // Promoting to admin clears scoped permissions (admins are全能).
+      target.role = ROLES.ADMIN;
+      target.permissions = undefined;
+    } else if (role === ROLES.MAINTAINER) {
+      target.role = ROLES.MAINTAINER;
+      target.permissions = permissions && permissions.length
+        ? permissions
+        : [...DEFAULT_MAINTAINER_PERMISSIONS];
+    } else {
+      // Demoting to student clears permissions.
+      target.role = ROLES.STUDENT;
+      target.permissions = undefined;
+    }
+
+    await target.save();
+    await logAudit({
+      adminId: req.user._id, adminEmail: req.user.email,
+      action: 'user_role_change', targetType: 'user', targetId: target._id,
+      targetTitle: target.fullname || target.email,
+      details: `Role set to ${target.role}${target.permissions?.length ? ` with permissions: ${target.permissions.join(', ')}` : ''}`,
+    });
+    res.json({ success: true, data: target.toPublicJSON() });
+  } catch (err) { next(err); }
+});
+
+// List the available permissions so the admin UI can render checkboxes.
+router.get('/permissions', authenticate, authorize('admin'), async (req, res, next) => {
+  try {
+    res.json({
+      success: true,
+      data: {
+        permissions: Object.entries(PERMISSIONS).map(([key, value]) => ({ key, value })),
+        defaults: DEFAULT_MAINTAINER_PERMISSIONS,
+        adminOnly: ADMIN_ONLY_PERMISSIONS,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+router.get('/comments', authenticate, authorizePermission(PERMISSIONS.COMMENT_MODERATE), async (req, res, next) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const safeLim = safeLimit(limit);
@@ -450,7 +504,7 @@ router.get('/notifications', authenticate, authorize('admin'), async (req, res, 
   } catch (err) { next(err); }
 });
 
-router.delete('/comments/:id', authenticate, authorize('admin'), async (req, res, next) => {
+router.delete('/comments/:id', authenticate, authorizePermission(PERMISSIONS.COMMENT_MODERATE), async (req, res, next) => {
   try {
     const comment = await Comment.findById(req.params.id).populate('noteId', 'title');
     if (!comment) return res.status(404).json({ success: false, message: 'Not found' });
@@ -492,6 +546,7 @@ router.post('/send-email', authenticate, authorize('admin'), async (req, res, ne
     if (!subject || !html) {
       return res.status(400).json({ success: false, message: 'Subject and HTML body are required' });
     }
+    const safeHtml = sanitizeRichHtml(html);
 
     let recipients = [];
     if (recipientType === 'all') {
@@ -509,7 +564,7 @@ router.post('/send-email', authenticate, authorize('admin'), async (req, res, ne
       const result = await sendCustomEmail({
         to: r.email,
         subject,
-        html: html.replace(/\{\{name\}\}/g, r.name),
+        html: safeHtml.replace(/\{\{name\}\}/g, r.name),
       });
       if (result.success) {
         results.sent++;
@@ -535,7 +590,7 @@ router.post('/send-email', authenticate, authorize('admin'), async (req, res, ne
   } catch (err) { next(err); }
 });
 
-router.post('/contact/:id/reply', authenticate, authorize('admin'), async (req, res, next) => {
+router.post('/contact/:id/reply', authenticate, authorizePermission(PERMISSIONS.CONTACT_MANAGE), async (req, res, next) => {
   try {
     const { replyContent } = req.body;
     if (!replyContent?.trim()) {
@@ -548,7 +603,7 @@ router.post('/contact/:id/reply', authenticate, authorize('admin'), async (req, 
       const emailResult = await sendCustomEmail({
         to: msg.email,
         subject: `Re: ${msg.topic || 'Your inquiry'}`,
-        html: `<p>Hi ${msg.name},</p><p>${replyContent.trim().replace(/\n/g, '<br>')}</p>`,
+        html: sanitizeRichHtml(`<p>Hi ${msg.name},</p><p>${replyContent.trim().replace(/\n/g, '<br>')}</p>`),
       });
       if (!emailResult.success) {
         const retry = getEmailRetryInfo();

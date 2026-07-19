@@ -95,6 +95,22 @@ async function createAdmin() {
   return { email, password: 'admin123', token };
 }
 
+// Create a student, then have an admin promote them to maintainer with a custom permission set.
+async function createMaintainer(permissions = ['note:moderate', 'report:manage']) {
+  const { token: adminToken } = await createAdmin();
+  const { email, password, token: studentToken } = await registerUser({ email: `maint_${Date.now()}_${crypto.randomBytes(4).toString('hex')}@example.com` });
+  const student = await User.findOne({ email });
+  const promoRes = await fetch(`${baseUrl}/api/admin/users/${student._id}/role`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Cookie: `accessToken=${adminToken}` },
+    body: JSON.stringify({ role: 'maintainer', permissions }),
+  });
+  assert.equal(promoRes.status, 200, 'promotion should succeed');
+  const body = await promoRes.json();
+  assert.equal(body.data.role, 'maintainer');
+  return { email, password, token: studentToken, userId: student._id, adminToken };
+}
+
 async function createHierarchy() {
   const university = await University.create({ name: 'Test University', slug: 'test-university' });
   const course = await Course.create({ name: 'Test Course', slug: 'test-course', universityId: university._id });
@@ -1895,5 +1911,118 @@ describe('14 — E2E Workflows', () => {
       assert.notEqual(await Course.findById(course._id), null, 'Course should NOT be deleted');
       assert.notEqual(await University.findById(uni._id), null, 'University should NOT be deleted');
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION 9: Maintainer (permission-based role)
+// ═══════════════════════════════════════════════════════════════
+describe('9 — Maintainer Role & Permissions', () => {
+  it('admin can promote a student to maintainer with default permissions', async () => {
+    const { token: adminToken } = await createAdmin();
+    const { token: studentToken, email } = await registerUser({ email: `maint_def_${Date.now()}@example.com` });
+    const student = await User.findOne({ email });
+    const res = await fetch(`${baseUrl}/api/admin/users/${student._id}/role`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Cookie: `accessToken=${adminToken}` },
+      body: JSON.stringify({ role: 'maintainer' }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.data.role, 'maintainer');
+    assert.ok(Array.isArray(body.data.permissions) && body.data.permissions.length > 0);
+  });
+
+  it('admin cannot promote themselves', async () => {
+    const { token: adminToken } = await createAdmin();
+    const admin = await User.findOne({ role: 'admin' });
+    const res = await fetch(`${baseUrl}/api/admin/users/${admin._id}/role`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Cookie: `accessToken=${adminToken}` },
+      body: JSON.stringify({ role: 'student' }),
+    });
+    assert.equal(res.status, 400);
+  });
+
+  it('cannot grant admin-only permissions to a maintainer', async () => {
+    const { token: adminToken } = await createAdmin();
+    const { token: studentToken, email } = await registerUser({ email: `maint_bad_${Date.now()}@example.com` });
+    const student = await User.findOne({ email });
+    const res = await fetch(`${baseUrl}/api/admin/users/${student._id}/role`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Cookie: `accessToken=${adminToken}` },
+      body: JSON.stringify({ role: 'maintainer', permissions: ['note:moderate', 'user:ban'] }),
+    });
+    assert.equal(res.status, 400);
+  });
+
+  it('maintainer WITH note:moderate can approve and delete notes', async () => {
+    const { token: maintainerToken, userId } = await createMaintainer(['note:moderate']);
+    const { university, course, semester, subject } = await createHierarchy();
+    const note = await createNoteDirectly(subject._id, userId, { approved: false, title: 'Maint Review' });
+
+    const approveRes = await fetch(`${baseUrl}/api/admin/notes/${note._id}/approve`, {
+      method: 'PATCH', headers: { Cookie: `accessToken=${maintainerToken}` },
+    });
+    assert.equal(approveRes.status, 200);
+
+    const delRes = await fetch(`${baseUrl}/api/admin/notes/${note._id}`, {
+      method: 'DELETE', headers: { Cookie: `accessToken=${maintainerToken}` },
+    });
+    assert.equal(delRes.status, 200);
+  });
+
+  it('maintainer WITHOUT note:moderate is rejected from note moderation', async () => {
+    const { token: maintainerToken, userId } = await createMaintainer(['report:manage']);
+    const { subject } = await createHierarchy();
+    const note = await createNoteDirectly(subject._id, userId, { approved: false });
+
+    const approveRes = await fetch(`${baseUrl}/api/admin/notes/${note._id}/approve`, {
+      method: 'PATCH', headers: { Cookie: `accessToken=${maintainerToken}` },
+    });
+    assert.equal(approveRes.status, 403);
+  });
+
+  it('maintainer can manage reports but CANNOT ban users (admin-only)', async () => {
+    const { token: maintainerToken, userId } = await createMaintainer(['report:manage']);
+    const { subject } = await createHierarchy();
+    const note = await createNoteDirectly(subject._id, userId, { approved: true });
+
+    // report list allowed
+    const repRes = await fetch(`${baseUrl}/api/reports/`, { headers: { Cookie: `accessToken=${maintainerToken}` } });
+    assert.equal(repRes.status, 200);
+
+    // ban is reserved for admin
+    const banRes = await fetch(`${baseUrl}/api/admin/users/${userId}/ban`, {
+      method: 'PATCH', headers: { Cookie: `accessToken=${maintainerToken}` },
+    });
+    assert.equal(banRes.status, 403);
+  });
+
+  it('maintainer can edit taxonomy but CANNOT delete it (admin-only)', async () => {
+    const { token: maintainerToken } = await createMaintainer(['taxonomy:edit']);
+    const uni = await University.create({ name: 'Maint Uni', slug: `maint-uni-${Date.now()}` });
+
+    const patchRes = await fetch(`${baseUrl}/api/universities/${uni._id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Cookie: `accessToken=${maintainerToken}` },
+      body: JSON.stringify({ name: 'Maint Uni Edited' }),
+    });
+    assert.equal(patchRes.status, 200);
+
+    const delRes = await fetch(`${baseUrl}/api/universities/${uni._id}`, {
+      method: 'DELETE', headers: { Cookie: `accessToken=${maintainerToken}` },
+    });
+    assert.equal(delRes.status, 403);
+  });
+
+  it('plain student (no permissions) is rejected from moderator endpoints', async () => {
+    const { token: studentToken, email } = await registerUser({ email: `plain_${Date.now()}@example.com` });
+    const student = await User.findOne({ email });
+    const { subject } = await createHierarchy();
+    const note = await createNoteDirectly(subject._id, student._id, { approved: false });
+    const res = await fetch(`${baseUrl}/api/admin/notes/${note._id}/approve`, {
+      method: 'PATCH', headers: { Cookie: `accessToken=${studentToken}` },
+    });
+    assert.equal(res.status, 403);
   });
 });

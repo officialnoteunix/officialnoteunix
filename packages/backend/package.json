@@ -13,13 +13,16 @@
   "dependencies": {
     "bcrypt": "^5.1.0",
     "cloudinary": "^1.41.0",
+    "compression": "^1.7.4",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "cross-env": "^10.1.0",
     "dotenv": "^16.4.0",
     "express": "^4.21.0",
+    "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
+    "hpp": "^0.2.3",
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^8.0.0",
     "morgan": "^1.10.0",
@@ -27,6 +30,8 @@
     "multer-storage-cloudinary": "^4.0.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "sanitize-html": "^2.13.0",
+    "sharp": "^0.33.0",
     "zod": "^3.23.0"
   }
 }

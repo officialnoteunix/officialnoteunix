@@ -2,10 +2,11 @@ import { Router } from 'express';
 import Course from '../models/Course.js';
 import Semester from '../models/Semester.js';
 import Subject from '../models/Subject.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { authenticate, authorize, authorizePermission } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createContentSchema, updateContentSchema } from '../validators/adminValidator.js';
 import { cascadeDeleteCourse } from '../utils/cascadeDelete.js';
+import { PERMISSIONS } from '../utils/constants.js';
 
 const router = Router();
 
@@ -34,14 +35,14 @@ router.get('/:id/semesters', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', authenticate, authorize('admin'), validate(createContentSchema), async (req, res, next) => {
+router.post('/', authenticate, authorizePermission(PERMISSIONS.TAXONOMY_EDIT), validate(createContentSchema), async (req, res, next) => {
   try {
     const course = await Course.create(req.validatedBody);
     res.status(201).json({ success: true, data: course });
   } catch (err) { next(err); }
 });
 
-router.patch('/:id', authenticate, authorize('admin'), validate(updateContentSchema), async (req, res, next) => {
+router.patch('/:id', authenticate, authorizePermission(PERMISSIONS.TAXONOMY_EDIT), validate(updateContentSchema), async (req, res, next) => {
   try {
     const course = await Course.findByIdAndUpdate(req.params.id, req.validatedBody, { new: true });
     if (!course) return res.status(404).json({ success: false, message: 'Not found' });

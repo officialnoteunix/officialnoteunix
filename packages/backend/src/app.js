@@ -3,14 +3,18 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
 import rateLimit from 'express-rate-limit';
+import mongoSanitize from 'express-mongo-sanitize';
+import hpp from 'hpp';
 import passport from 'passport';
 import routes from './routes/index.js';
 import errorHandler from './middleware/errorHandler.js';
 import configurePassport from './config/passport.js';
+import { RATE_LIMIT } from './utils/constants.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,6 +34,10 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
 }));
+// Strip NoSQL operator keys ($gt, $set, etc.) and prevent prototype pollution.
+app.use(mongoSanitize());
+app.use(hpp());
+app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use(morgan('dev'));
@@ -55,8 +63,8 @@ function createRateLimiter(windowMs, max) {
   });
 }
 
-app.use('/api/auth', createRateLimiter(60 * 1000, 30));
-app.use('/api', createRateLimiter(60 * 1000, 250));
+app.use('/api/auth', createRateLimiter(RATE_LIMIT.AUTH_WINDOW_MS, RATE_LIMIT.AUTH_MAX_REQUESTS));
+app.use('/api', createRateLimiter(RATE_LIMIT.GENERAL_WINDOW_MS, RATE_LIMIT.GENERAL_MAX_REQUESTS));
 
 const distPath = path.resolve(__dirname, '../../frontend/dist');
 const fs = await import('fs');

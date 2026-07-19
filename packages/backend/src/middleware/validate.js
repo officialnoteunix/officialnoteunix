@@ -1,3 +1,5 @@
+import { sanitizeText } from '../utils/sanitize.js';
+
 export function validate(schema) {
   return (req, res, next) => {
     const result = schema.safeParse(req.body);
@@ -14,3 +16,19 @@ export function validate(schema) {
     next();
   };
 }
+
+// Strip HTML from the given string fields on req.body (defense against stored XSS).
+// Apply BEFORE validate() so schemas operate on cleaned input.
+export function sanitizeTextFields(...fields) {
+  return (req, res, next) => {
+    if (req.body && typeof req.body === 'object') {
+      for (const field of fields) {
+        if (typeof req.body[field] === 'string') {
+          req.body[field] = sanitizeText(req.body[field]);
+        }
+      }
+    }
+    next();
+  };
+}
+

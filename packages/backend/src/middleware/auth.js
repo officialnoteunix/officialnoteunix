@@ -55,3 +55,17 @@ export function authorize(...roles) {
     next();
   };
 }
+
+// Permission-based guard: admin always passes; maintainer must hold the required permission.
+export function authorizePermission(...requiredPermissions) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    const allowed = requiredPermissions.every(p => req.user.hasPermission(p));
+    if (!allowed) {
+      return res.status(403).json({ success: false, message: 'You do not have permission to perform this action' });
+    }
+    next();
+  };
+}

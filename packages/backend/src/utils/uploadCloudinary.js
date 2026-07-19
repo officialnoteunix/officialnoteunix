@@ -1,11 +1,19 @@
 import cloudinary from '../config/cloudinary.js';
 import { MIME_TO_EXT } from './constants.js';
+import { compressImageBuffer, makeThumbnailBuffer, isProcessableImage } from './imageProcess.js';
 
 export function uploadBuffer(buffer, options = {}) {
-  const { folder = 'noteunix/notes', resourceType = 'auto' } = options;
+  const { folder = 'noteunix/notes', resourceType = 'auto', transformation } = options;
+  const uploadOptions = { folder, resource_type: resourceType };
+  // Cloudinary auto-optimization: serve modern format + auto quality.
+  if (resourceType === 'auto' || resourceType === 'image') {
+    uploadOptions.format = 'auto';
+    uploadOptions.quality = 'auto';
+  }
+  if (transformation) uploadOptions.transformation = transformation;
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type: resourceType },
+      uploadOptions,
       (err, result) => {
         if (err) {
           const e = new Error(err.message || 'Cloudinary upload failed');
@@ -26,7 +34,6 @@ export function uploadBuffer(buffer, options = {}) {
 
 export async function uploadFiles(uploadedFiles, folder = 'noteunix/notes') {
   for (const f of uploadedFiles) {
-    const isImage = f.mimetype?.startsWith('image/');
     const isArchive = ['application/zip', 'application/x-zip-compressed', 'application/x-7z-compressed', 'application/x-rar-compressed'].includes(f.mimetype);
     if (isArchive) {
       const err = new Error(`"${f.originalname}" is a compressed archive. Please upload the uncompressed file directly (PDF, DOCX, etc.)`);
@@ -36,18 +43,43 @@ export async function uploadFiles(uploadedFiles, folder = 'noteunix/notes') {
   }
   return Promise.all(uploadedFiles.map(async (f) => {
     const isImage = f.mimetype?.startsWith('image/');
-    const result = await uploadBuffer(f.buffer, { folder, resourceType: isImage ? 'auto' : 'raw' });
+    let buffer = f.buffer;
+    let fileType = MIME_TO_EXT[f.mimetype] || 'bin';
+    let size = f.size;
+    if (isImage && (await isProcessableImage(f.buffer))) {
+      try {
+        buffer = await compressImageBuffer(f.buffer);
+        fileType = 'webp';
+        size = buffer.length;
+      } catch {
+        // Fall back to original buffer if sharp fails.
+        buffer = f.buffer;
+      }
+    }
+    const result = await uploadBuffer(buffer, { folder, resourceType: isImage ? 'auto' : 'raw' });
     return {
       url: result.secure_url,
-      fileType: MIME_TO_EXT[f.mimetype] || 'bin',
-      fileSize: f.size,
+      fileType,
+      fileSize: size,
       publicId: result.public_id || '',
     };
   }));
 }
 
 export async function uploadThumbnail(buffer) {
-  const result = await uploadBuffer(buffer, { folder: 'noteunix/thumbnails', resourceType: 'image' });
+  let thumb = buffer;
+  if (await isProcessableImage(buffer)) {
+    try {
+      thumb = await makeThumbnailBuffer(buffer);
+    } catch {
+      thumb = buffer;
+    }
+  }
+  const result = await uploadBuffer(thumb, {
+    folder: 'noteunix/thumbnails',
+    resourceType: 'image',
+    transformation: [{ width: 400, height: 400, crop: 'limit', fetch_format: 'auto', quality: 'auto' }],
+  });
   return result.secure_url;
 }
 
