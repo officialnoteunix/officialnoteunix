@@ -10,7 +10,12 @@ import AdminLayout from './components/layout/AdminLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AdminRoute from './components/auth/AdminRoute';
 import MaintainerRoute from './components/auth/MaintainerRoute';
-import MaintainerLayout from './components/layout/MaintainerLayout';
+import MaintainerLayout, { firstMaintainerPath } from './components/layout/MaintainerLayout';
+
+function MaintainerIndex() {
+  const { user } = useAuth();
+  return <Navigate to={firstMaintainerPath(user?.permissions, user?.role)} replace />;
+}
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/Login'));
@@ -137,7 +142,7 @@ export default function App() {
             </MaintainerRoute>
           }
         >
-          <Route index element={<Navigate to="notes" replace />} />
+          <Route index element={<MaintainerIndex />} />
           <Route path="notes" element={<AdminNotes />} />
           <Route path="comments" element={<AdminComments />} />
           <Route path="reports" element={<AdminReports />} />

@@ -10,7 +10,31 @@ import {
   Megaphone, MessageSquare, Menu, X, BarChart3, MessageCircle, Shield, UserCog,
 } from 'lucide-react';
 import LogoutModal from '../ui/LogoutModal';
-import { MAINTAINER_PERMISSIONS } from '../../utils/constants';
+
+interface MaintainerLink {
+  to: string;
+  label: string;
+  icon: any;
+  category: string;
+  perm: string;
+  badge?: number | undefined;
+}
+
+export const MAINTAINER_LINKS: MaintainerLink[] = [
+  { to: '/maintainer/notes', label: 'Notes', icon: FileText, category: 'Moderation', perm: 'note:moderate' },
+  { to: '/maintainer/comments', label: 'Comments', icon: MessageCircle, category: 'Moderation', perm: 'comment:moderate' },
+  { to: '/maintainer/reports', label: 'Reports', icon: Flag, category: 'Moderation', perm: 'report:manage' },
+  { to: '/maintainer/messages', label: 'Messages', icon: MessageSquare, category: 'Moderation', perm: 'contact:manage' },
+  { to: '/maintainer/ads', label: 'Ads', icon: Megaphone, category: 'Content', perm: 'ad:manage' },
+  { to: '/maintainer/content', label: 'Taxonomy', icon: BookOpen, category: 'Content', perm: 'taxonomy:edit' },
+  { to: '/maintainer/analytics', label: 'Analytics', icon: BarChart3, category: 'Insights', perm: 'analytics:view' },
+];
+
+export function firstMaintainerPath(permissions: string[] | undefined, role: string | undefined): string {
+  const isAdmin = role === 'admin';
+  const link = MAINTAINER_LINKS.find(l => isAdmin || (permissions || []).includes(l.perm));
+  return link ? link.to : '/maintainer/notes';
+}
 
 export default function MaintainerLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -59,19 +83,18 @@ export default function MaintainerLayout() {
 
   const has = (key: string) => isAdmin || perms.includes(key);
 
-  const allLinks = [
-    { to: '/maintainer/notes', label: 'Notes', icon: FileText, category: 'Moderation', perm: 'note:moderate', badge: badgeNew(stats.pendingNotes, seenNotes) },
-    { to: '/maintainer/comments', label: 'Comments', icon: MessageCircle, category: 'Moderation', perm: 'comment:moderate' },
-    { to: '/maintainer/reports', label: 'Reports', icon: Flag, category: 'Moderation', perm: 'report:manage', badge: badgeNew(stats.pendingReports, seenReports) },
-    { to: '/maintainer/messages', label: 'Messages', icon: MessageSquare, category: 'Moderation', perm: 'contact:manage', badge: badgeNew(stats.unreadContactMessages, seenMessages) },
-    { to: '/maintainer/ads', label: 'Ads', icon: Megaphone, category: 'Content', perm: 'ad:manage' },
-    { to: '/maintainer/content', label: 'Taxonomy', icon: BookOpen, category: 'Content', perm: 'taxonomy:edit' },
-    { to: '/maintainer/analytics', label: 'Analytics', icon: BarChart3, category: 'Insights', perm: 'analytics:view' },
-  ];
+  const allLinks = MAINTAINER_LINKS.map(l => ({
+    ...l,
+    badge: l.perm === 'note:moderate' ? badgeNew(stats.pendingNotes, seenNotes)
+      : l.perm === 'report:manage' ? badgeNew(stats.pendingReports, seenReports)
+      : l.perm === 'contact:manage' ? badgeNew(stats.unreadContactMessages, seenMessages)
+      : undefined,
+  }));
 
   const links = allLinks.filter(l => has(l.perm));
   const seenCategories = new Set<string>();
   const currentPage = links.find(l => pathname.startsWith(l.to))?.label || 'Moderation';
+  const defaultPath = links[0]?.to || '/maintainer/notes';
 
   return (
     <div className="dashboard-container">
@@ -79,12 +102,12 @@ export default function MaintainerLayout() {
       <aside className={`dashboard-sidebar ${collapsed ? 'collapsed' : ''} ${sidebarOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
           {!collapsed ? (
-            <Link to="/maintainer/notes" className="logo-container">
+            <Link to={defaultPath} className="logo-container">
               <span style={{ color: 'var(--text-main)', fontWeight: 800, fontSize: 17 }}>Note</span>
               <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: 17 }}>UniX</span>
             </Link>
           ) : (
-            <Link to="/maintainer/notes" style={{ textDecoration: 'none' }}>
+            <Link to={defaultPath} style={{ textDecoration: 'none' }}>
               <span style={{ color: 'var(--primary)', fontWeight: 900, fontSize: 18 }}>N</span>
             </Link>
           )}
@@ -142,7 +165,7 @@ export default function MaintainerLayout() {
               <Menu size={20} />
             </button>
             <nav className="breadcrumb-nav">
-              <Link to="/maintainer/notes" className="breadcrumb-item">Maintainer</Link>
+              <Link to={defaultPath} className="breadcrumb-item">Maintainer</Link>
               <ChevronRight size={14} className="breadcrumb-separator" />
               <span className="breadcrumb-current">{currentPage}</span>
             </nav>
