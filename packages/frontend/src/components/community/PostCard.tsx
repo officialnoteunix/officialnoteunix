@@ -28,6 +28,7 @@ export default function PostCard({ post, onDeleted, onChanged }: { post: FeedPos
   const { showToast } = useToast();
   const [liked, setLiked] = useState(post.isLiked ?? false);
   const [likes, setLikes] = useState(post.likesCount);
+  const [shares, setShares] = useState(post.sharesCount || 0);
   const [menuOpen, setMenuOpen] = useState(false);
   const isOwner = user?.id === post.author?.id;
   const isMaintainer = user?.permissions?.includes('feed:moderate');
@@ -55,6 +56,26 @@ export default function PostCard({ post, onDeleted, onChanged }: { post: FeedPos
     } catch (err) {
       showToast('error', getApiError(err, 'Delete failed'));
     }
+  };
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = `${window.location.origin}/community/post/${post.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'NoteUniX Community', text: post.content || 'Check this post', url });
+      } else {
+        await navigator.clipboard?.writeText(url);
+        showToast('success', 'Link copied');
+      }
+    } catch { /* user cancelled share */ }
+    if (!user) return;
+    try {
+      const res = await feedApi.share(post.id);
+      setShares(res.data.data.sharesCount);
+      onChanged?.({ ...post, sharesCount: res.data.data.sharesCount });
+    } catch { /* non-critical */ }
   };
 
   return (
@@ -108,7 +129,7 @@ export default function PostCard({ post, onDeleted, onChanged }: { post: FeedPos
       <div className="feed-post-actions">
         <button className={`feed-action ${liked ? 'liked' : ''}`} onClick={toggleLike}><Heart size={18} /> {likes}</button>
         <Link to={`/community/post/${post.id}`} className="feed-action"><MessageCircle size={18} /> {post.commentsCount}</Link>
-        <button className="feed-action" onClick={(e) => { e.preventDefault(); navigator.clipboard?.writeText(`${window.location.origin}/community/post/${post.id}`); showToast('success', 'Link copied'); }}><Share2 size={18} /> {post.sharesCount}</button>
+        <button className="feed-action" onClick={handleShare}><Share2 size={18} /> {shares}</button>
       </div>
     </article>
   );

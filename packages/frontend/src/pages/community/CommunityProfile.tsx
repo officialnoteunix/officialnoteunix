@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { UserPlus, UserCheck, FileText } from 'lucide-react';
+import { UserPlus, UserCheck } from 'lucide-react';
 import { feedApi } from '../../api/feed';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';

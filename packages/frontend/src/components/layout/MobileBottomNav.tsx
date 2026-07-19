@@ -1,10 +1,11 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, BookOpen } from 'lucide-react';
+import { Home, Search, BookOpen, Users } from 'lucide-react';
 
 const tabs = [
   { to: '/', icon: Home, label: 'Home' },
   { to: '/notes', icon: Search, label: 'Browse' },
+  { to: '/community', icon: Users, label: 'Community' },
   { to: '/contact', icon: BookOpen, label: 'Contact' },
 ];
 

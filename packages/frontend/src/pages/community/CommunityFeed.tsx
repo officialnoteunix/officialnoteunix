@@ -83,7 +83,6 @@ export default function CommunityFeed() {
     <div className="community-page">
       <div className="community-header">
         <h1>Community</h1>
-        <p>Share, discover, and connect — a feed that learns what you love.</p>
       </div>
 
       <PostComposer onPosted={handlePosted} />

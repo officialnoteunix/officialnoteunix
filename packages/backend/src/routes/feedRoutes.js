@@ -103,8 +103,24 @@ export function broadcastPost(post) {
   }
 }
 
+// Parse form-data fields that arrive as JSON strings (tags) before validation.
+function parseMultipartBody(req, res, next) {
+  if (req.body && typeof req.body.tags === 'string') {
+    const raw = req.body.tags.trim();
+    try {
+      const parsed = JSON.parse(raw);
+      req.body.tags = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      // Tolerate unquoted client payloads like [study,motivation]
+      const inner = raw.replace(/^\[|\]$/g, '').trim();
+      req.body.tags = inner ? inner.split(',').map((t) => t.trim().replace(/^["']|["']$/g, '')).filter(Boolean) : [];
+    }
+  }
+  next();
+}
+
 // Create a post (text ± images/videos)
-router.post('/posts', authenticate, postLimiter, uploadMedia.array('media', 8), sanitizeTextFields('content'), validate(createPostSchema), async (req, res, next) => {
+router.post('/posts', authenticate, postLimiter, uploadMedia.array('media', 8), sanitizeTextFields('content'), parseMultipartBody, validate(createPostSchema), async (req, res, next) => {
   try {
     let media = [];
     if (req.files && req.files.length) {
@@ -272,6 +288,18 @@ router.post('/posts/:id/like', authenticate, likeLimiter, async (req, res, next)
   } catch (err) { next(err); }
 });
 
+// Share a post (increments share count)
+router.post('/posts/:id/share', authenticate, likeLimiter, async (req, res, next) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ success: false, message: 'Post not found' });
+    post.sharesCount += 1;
+    post.score = computeScore(post, {});
+    await post.save();
+    res.json({ success: true, data: { sharesCount: post.sharesCount } });
+  } catch (err) { next(err); }
+});
+
 // Comment on a post
 router.post('/posts/:id/comment', authenticate, likeLimiter, sanitizeTextFields('content'), validate(createCommentSchema), async (req, res, next) => {
   try {
@@ -298,10 +326,14 @@ router.post('/posts/:id/comment', authenticate, likeLimiter, sanitizeTextFields(
 // Follow / unfollow a user
 router.post('/users/:id/follow', authenticate, followLimiter, async (req, res, next) => {
   try {
-    const targetId = req.params.id;
-    if (targetId === req.user.id) return res.status(400).json({ success: false, message: 'Cannot follow yourself' });
-    const target = await User.findById(targetId);
+    const idOrName = req.params.id;
+    const isObjectId = Types.ObjectId.isValid(idOrName) && String(new Types.ObjectId(idOrName)) === idOrName;
+    const target = isObjectId
+      ? await User.findById(idOrName)
+      : await User.findOne({ username: idOrName.toLowerCase() });
     if (!target) return res.status(404).json({ success: false, message: 'User not found' });
+    const targetId = target._id.toString();
+    if (targetId === req.user.id) return res.status(400).json({ success: false, message: 'Cannot follow yourself' });
 
     const existing = await Follow.findOne({ follower: req.user.id, following: targetId });
     let isFollowing;
@@ -328,14 +360,19 @@ router.post('/users/:id/follow', authenticate, followLimiter, async (req, res, n
   } catch (err) { next(err); }
 });
 
-// A user's posts (profile)
+// A user's posts (profile) — accepts ObjectId or username
 router.get('/users/:id/posts', optionalAuth, async (req, res, next) => {
   try {
     const viewerId = req.user?.id;
-    const target = await User.findById(req.params.id);
+    const idOrName = req.params.id;
+    const isObjectId = Types.ObjectId.isValid(idOrName) && String(new Types.ObjectId(idOrName)) === idOrName;
+    const target = isObjectId
+      ? await User.findById(idOrName)
+      : await User.findOne({ username: idOrName.toLowerCase() });
     if (!target) return res.status(404).json({ success: false, message: 'User not found' });
-    const isSelf = viewerId === req.params.id;
-    const match = { author: new Types.ObjectId(req.params.id) };
+    const targetId = target._id.toString();
+    const isSelf = viewerId === targetId;
+    const match = { author: target._id };
     if (!isSelf) match.visibility = 'public';
     const posts = await Post.find(match).populate(POST_POPULATE).sort({ createdAt: -1 }).limit(60).lean();
     res.json({ success: true, data: { posts, user: target.toPublicJSON() } });

@@ -48,6 +48,7 @@ export const feedApi = {
     api.patch(`/feed/posts/${id}`, data),
   remove: (id: string) => api.delete(`/feed/posts/${id}`),
   like: (id: string) => api.post(`/feed/posts/${id}/like`),
+  share: (id: string) => api.post(`/feed/posts/${id}/share`),
   comment: (id: string, content: string) => api.post(`/feed/posts/${id}/comment`, { content }),
   follow: (id: string) => api.post(`/feed/users/${id}/follow`),
   userPosts: (id: string) => api.get(`/feed/users/${id}/posts`),
