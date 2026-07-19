@@ -792,8 +792,10 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
+  right: 0;
   width: 100%;
-  min-width: max-content;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -803,6 +805,12 @@
   overflow-y: auto;
   padding: 6px;
   animation: fadeInDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.custom-select-dropdown.drop-up {
+  top: auto;
+  bottom: calc(100% + 6px);
+  animation: fadeInUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .custom-select-dropdown::-webkit-scrollbar {
@@ -820,6 +828,17 @@
   from {
     opacity: 0;
     transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
   }
   to {
     opacity: 1;
