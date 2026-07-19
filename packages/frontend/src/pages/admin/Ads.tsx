@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { adApi } from '../../api/ad';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { emitStatsRefresh } from '../../utils/statsRefresh';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import DetailModal from '../../components/ui/DetailModal';
@@ -23,6 +24,8 @@ const PER_PAGE = 5;
 
 export default function AdminAds() {
   const { showToast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<ViewMode>('table');
@@ -221,9 +224,11 @@ export default function AdminAds() {
                       <button onClick={() => openEdit(ad)} className="btn-rounded btn-ghost" style={{ padding: '5px 10px', fontSize: 11, display: 'flex', gap: 3, alignItems: 'center' }}>
                         <Edit2 size={11} /> Edit
                       </button>
+                      {isAdmin && (
                       <button onClick={() => setDeleteTarget(ad)} className="btn-rounded" style={{ padding: '5px 10px', fontSize: 11, backgroundColor: 'var(--danger)', color: '#fff', display: 'flex', gap: 3, alignItems: 'center' }}>
                         <Trash2 size={11} />
                       </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -413,9 +418,11 @@ export default function AdminAds() {
             <button onClick={() => { setDetailTarget(null); openEdit(detailTarget); }} className="btn-rounded btn-ghost" style={{ padding: '7px 14px', fontSize: 12, display: 'flex', gap: 4, alignItems: 'center' }}>
               <Edit2 size={13} /> Edit
             </button>
+            {isAdmin && (
             <button onClick={() => { setDetailTarget(null); setDeleteTarget(detailTarget); }} className="btn-rounded" style={{ padding: '7px 14px', fontSize: 12, backgroundColor: 'var(--danger)', color: '#fff', display: 'flex', gap: 4, alignItems: 'center' }}>
               <Trash2 size={13} /> Delete
             </button>
+            )}
           </>
         )}
       </DetailModal>

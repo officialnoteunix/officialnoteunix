@@ -123,18 +123,6 @@ export default function UserDetail() {
     }
   }, [restrictTarget, showToast, loadUser]);
 
-  const handleToggleVerify = useCallback(async () => {
-    if (!user) return;
-    try {
-      const res = await adminApi.toggleVerify(user._id);
-      setUser(prev => prev ? { ...prev, isVerified: res.data.data.isVerified } : prev);
-      showToast('success', `Verification ${res.data.data.isVerified ? 'granted' : 'removed'} for ${user.fullname}`);
-      emitStatsRefresh();
-    } catch (err) {
-      showToast('error', getApiError(err, 'Failed to toggle verification'));
-    }
-  }, [user, showToast]);
-
   const isSelf = currentUser?.id === user?._id;
   const canManageRole = currentUser?.role === 'admin' && !isSelf && user?.role !== 'admin';
   const [rolePanelOpen, setRolePanelOpen] = useState(false);
@@ -219,18 +207,6 @@ export default function UserDetail() {
                 ) : (
                   <button onClick={() => setRestrictTarget(user)} className="btn-rounded" style={{ padding: '5px 12px', fontSize: 11, backgroundColor: 'var(--danger)', color: '#fff', display: 'flex', gap: 4, alignItems: 'center' }}>
                     <ShieldOff size={12} /> Restrict
-                  </button>
-                )}
-                {user.role !== 'admin' && (
-                  <button onClick={handleToggleVerify} className="btn-rounded" style={{
-                    padding: '5px 12px', fontSize: 11,
-                    backgroundColor: user.isVerified ? 'var(--bg-subtle)' : 'var(--primary)',
-                    color: user.isVerified ? 'var(--text-muted)' : '#fff',
-                    display: 'flex', gap: 4, alignItems: 'center',
-                    border: user.isVerified ? '1px solid var(--border-color)' : 'none',
-                  }}>
-                    <BadgeCheck size={12} />
-                    {user.isVerified ? 'Unverify' : 'Verify'}
                   </button>
                 )}
               </span>

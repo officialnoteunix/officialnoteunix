@@ -29,8 +29,6 @@ export const adminApi = {
     api.delete<APIResponse<void>>(`/admin/notes/${id}`),
   toggleBan: (id: string) =>
     api.patch<APIResponse<User>>(`/admin/users/${id}/ban`),
-  toggleVerify: (id: string) =>
-    api.patch<APIResponse<User>>(`/admin/users/${id}/verify`),
   suspendUser: (id: string, durationHours: number) =>
     api.patch<APIResponse<User>>(`/admin/users/${id}/suspend`, { durationHours }),
   deleteUser: (id: string) =>

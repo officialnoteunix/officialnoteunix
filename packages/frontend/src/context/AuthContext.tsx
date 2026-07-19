@@ -5,7 +5,8 @@ interface User {
   id: string;
   fullname: string;
   email: string;
-  role: string;
+  role: 'student' | 'maintainer' | 'admin';
+  permissions?: string[];
   avatar: string | null;
   banned: boolean;
   emailVerified: boolean;

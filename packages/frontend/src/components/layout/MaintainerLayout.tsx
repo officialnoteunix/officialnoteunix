@@ -1,56 +1,77 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { userApi } from '../../api/user';
 import { useLocalStorage, useLocalStorageNum } from '../../utils/useLocalStorage';
+import { useStatsRefresh } from '../../utils/statsRefresh';
 import {
-  LayoutDashboard, Bookmark, FileText, Flag, Settings, Bell,
-  LogOut, Sun, Moon, ChevronLeft, ChevronRight, BookOpen, Menu, X, Shield
+  LayoutDashboard, BookOpen, FileText, Flag,
+  LogOut, Sun, Moon, ChevronLeft, ChevronRight,
+  Megaphone, MessageSquare, Menu, X, BarChart3, MessageCircle, Shield, UserCog,
 } from 'lucide-react';
-import NotificationBell from '../notification/NotificationBell';
 import LogoutModal from '../ui/LogoutModal';
-import { useNotificationCount } from '../../context/NotificationContext';
+import { MAINTAINER_PERMISSIONS } from '../../utils/constants';
 
-export default function UserLayout() {
+export default function MaintainerLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
-  const [stats, setStats] = useLocalStorage<Record<string, number>>('userStats', {});
+  const [stats, setStats] = useLocalStorage<Record<string, number>>('maintainerStats', {});
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { pathname } = useLocation();
-  const { unreadCount } = useNotificationCount();
+
+  const isAdmin = user?.role === 'admin';
+  const perms = user?.permissions || [];
+
+  const refreshStats = useCallback(() => {
+    if (isAdmin) {
+      import('../../api/admin').then(({ adminApi }) =>
+        adminApi.stats().then(r => setStats(r.data.data)).catch(() => {})
+      );
+    }
+  }, [isAdmin, setStats]);
+
+  useEffect(() => { refreshStats(); }, [refreshStats]);
+  useStatsRefresh(refreshStats);
+
+  const [seenNotes, setSeenNotes] = useLocalStorageNum('seen_/maintainer/notes');
+  const [seenReports, setSeenReports] = useLocalStorageNum('seen_/maintainer/reports');
+  const [seenMessages, setSeenMessages] = useLocalStorageNum('seen_/maintainer/messages');
 
   useEffect(() => {
-    userApi.dashboardStats().then(r => setStats(r.data.data)).catch(() => {});
-  }, [setStats]);
-
-  const [seenMyNotes, setSeenMyNotes] = useLocalStorageNum('seen_/user/my-notes');
+    if (pathname === '/maintainer/notes' && stats.pendingNotes != null) setSeenNotes(stats.pendingNotes);
+    if (pathname === '/maintainer/reports' && stats.pendingReports != null) setSeenReports(stats.pendingReports);
+  }, [pathname, stats.pendingNotes, stats.pendingReports, setSeenNotes, setSeenReports]);
 
   useEffect(() => {
-    if (pathname === '/user/my-notes' && stats.pendingNotes != null) setSeenMyNotes(stats.pendingNotes);
-  }, [pathname, stats.pendingNotes, setSeenMyNotes]);
+    if (pathname === '/maintainer/messages' && (stats.unreadContactMessages ?? 0) > 0) {
+      import('../../api/admin').then(({ adminApi }) =>
+        adminApi.markAllContactRead().then(() => setSeenMessages(0)).catch(() => {})
+      );
+    }
+  }, [pathname, setSeenMessages]);
 
   const badgeNew = (current: number | undefined, seen: number): number | undefined => {
     if (!current || current <= 0) return undefined;
     return current > seen ? current - seen : undefined;
   };
 
-  const links = [
-    { to: '/user/dashboard', label: 'Dashboard', icon: LayoutDashboard, category: 'Overview' },
-    { to: '/user/browse', label: 'Browse Notes', icon: BookOpen, category: 'Content' },
-    { to: '/user/my-notes', label: 'My Notes', icon: FileText, category: 'Content', badge: badgeNew(stats.pendingNotes, seenMyNotes) },
-    { to: '/user/bookmarks', label: 'Bookmarks', icon: Bookmark, category: 'Content' },
-    { to: '/user/notifications', label: 'Notifications', icon: Bell, category: 'Support', badge: unreadCount },
-    { to: '/user/reports', label: 'Reports', icon: Flag, category: 'Support' },
-    { to: '/user/settings', label: 'Settings', icon: Settings, category: 'Support' },
+  const has = (key: string) => isAdmin || perms.includes(key);
+
+  const allLinks = [
+    { to: '/maintainer/notes', label: 'Notes', icon: FileText, category: 'Moderation', perm: 'note:moderate', badge: badgeNew(stats.pendingNotes, seenNotes) },
+    { to: '/maintainer/comments', label: 'Comments', icon: MessageCircle, category: 'Moderation', perm: 'comment:moderate' },
+    { to: '/maintainer/reports', label: 'Reports', icon: Flag, category: 'Moderation', perm: 'report:manage', badge: badgeNew(stats.pendingReports, seenReports) },
+    { to: '/maintainer/messages', label: 'Messages', icon: MessageSquare, category: 'Moderation', perm: 'contact:manage', badge: badgeNew(stats.unreadContactMessages, seenMessages) },
+    { to: '/maintainer/ads', label: 'Ads', icon: Megaphone, category: 'Content', perm: 'ad:manage' },
+    { to: '/maintainer/content', label: 'Taxonomy', icon: BookOpen, category: 'Content', perm: 'taxonomy:edit' },
+    { to: '/maintainer/analytics', label: 'Analytics', icon: BarChart3, category: 'Insights', perm: 'analytics:view' },
   ];
 
-  const showMaintainerLink = user?.role === 'maintainer' || user?.role === 'admin';
-
-  const currentPage = links.find(l => l.to === pathname)?.label || 'Dashboard';
+  const links = allLinks.filter(l => has(l.perm));
   const seenCategories = new Set<string>();
+  const currentPage = links.find(l => pathname.startsWith(l.to))?.label || 'Moderation';
 
   return (
     <div className="dashboard-container">
@@ -58,12 +79,12 @@ export default function UserLayout() {
       <aside className={`dashboard-sidebar ${collapsed ? 'collapsed' : ''} ${sidebarOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
           {!collapsed ? (
-            <Link to="/user/dashboard" className="logo-container">
+            <Link to="/maintainer/notes" className="logo-container">
               <span style={{ color: 'var(--text-main)', fontWeight: 800, fontSize: 17 }}>Note</span>
               <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: 17 }}>UniX</span>
             </Link>
           ) : (
-            <Link to="/user/dashboard" style={{ textDecoration: 'none' }}>
+            <Link to="/maintainer/notes" style={{ textDecoration: 'none' }}>
               <span style={{ color: 'var(--primary)', fontWeight: 900, fontSize: 18 }}>N</span>
             </Link>
           )}
@@ -72,6 +93,9 @@ export default function UserLayout() {
           </button>
         </div>
         <nav className="sidebar-nav">
+          {links.length === 0 && !collapsed && (
+            <div className="sidebar-section">No access</div>
+          )}
           {links.map(link => {
             const Icon = link.icon;
             const showCategory = link.category && !seenCategories.has(link.category);
@@ -81,41 +105,29 @@ export default function UserLayout() {
                 {showCategory && !collapsed && (
                   <div className="sidebar-section">{link.category}</div>
                 )}
-            <NavLink
-              to={link.to}
-              className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-            >
-              <Icon size={20} />
-              {!collapsed && <span>{link.label}</span>}
-              {link.badge ? <span className="sidebar-badge" style={link.label === 'Notifications' ? { background: 'var(--danger)' } : undefined}>{link.badge}</span> : null}
-            </NavLink>
-          </div>
-        );
-      })}
-      {showMaintainerLink && (
-        <div>
-          <div className="sidebar-section">Staff</div>
-          <NavLink
-            to="/maintainer/notes"
-            className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-          >
-            <Shield size={20} />
-            {!collapsed && <span>Moderator Panel</span>}
-          </NavLink>
-        </div>
-      )}
+                <NavLink
+                  to={link.to}
+                  className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                >
+                  <Icon size={20} />
+                  {!collapsed && <span>{link.label}</span>}
+                  {link.badge ? <span className="sidebar-badge">{link.badge}</span> : null}
+                </NavLink>
+              </div>
+            );
+          })}
         </nav>
-        <Link to="/user/profile" className="sidebar-footer" style={{ textDecoration: 'none', cursor: 'pointer' }}>
+        <div className="sidebar-footer">
           <div className="user-avatar" style={user?.avatar ? { background: `url(${user.avatar}) center/cover`, color: 'transparent' } : {}}>
-            {user?.avatar ? '' : (user?.fullname?.charAt(0).toUpperCase() || 'U')}
+            {user?.avatar ? '' : (user?.fullname?.charAt(0).toUpperCase() || 'M')}
           </div>
           {!collapsed && (
             <div className="user-info">
-              <span className="user-name">{user?.fullname || 'User'}</span>
-              <span className="user-role">{user?.role || 'Student'}</span>
+              <span className="user-name">{user?.fullname || 'Maintainer'}</span>
+              <span className="user-role">{user?.role === 'admin' ? 'Administrator' : 'Maintainer'}</span>
             </div>
           )}
-        </Link>
+        </div>
       </aside>
 
       <div className={`dashboard-main ${collapsed ? 'expanded' : ''}`}>
@@ -130,13 +142,12 @@ export default function UserLayout() {
               <Menu size={20} />
             </button>
             <nav className="breadcrumb-nav">
-              <Link to="/user/dashboard" className="breadcrumb-item">Dashboard</Link>
+              <Link to="/maintainer/notes" className="breadcrumb-item">Maintainer</Link>
               <ChevronRight size={14} className="breadcrumb-separator" />
               <span className="breadcrumb-current">{currentPage}</span>
             </nav>
           </div>
           <div className="topbar-actions">
-            <NotificationBell />
             <button
               onClick={toggleTheme}
               className="sidebar-toggle-btn"

@@ -9,6 +9,8 @@ import UserLayout from './components/layout/UserLayout';
 import AdminLayout from './components/layout/AdminLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AdminRoute from './components/auth/AdminRoute';
+import MaintainerRoute from './components/auth/MaintainerRoute';
+import MaintainerLayout from './components/layout/MaintainerLayout';
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/Login'));
@@ -125,6 +127,24 @@ export default function App() {
           <Route path="audit-logs" element={<AdminAuditLogs />} />
           <Route path="mail" element={<AdminMail />} />
           <Route path="notifications" element={<Notifications />} />
+        </Route>
+
+        <Route
+          path="/maintainer"
+          element={
+            <MaintainerRoute>
+              <MaintainerLayout />
+            </MaintainerRoute>
+          }
+        >
+          <Route index element={<Navigate to="notes" replace />} />
+          <Route path="notes" element={<AdminNotes />} />
+          <Route path="comments" element={<AdminComments />} />
+          <Route path="reports" element={<AdminReports />} />
+          <Route path="messages" element={<AdminMessages />} />
+          <Route path="ads" element={<AdminAds />} />
+          <Route path="content" element={<AdminContent />} />
+          <Route path="analytics" element={<AdminAnalytics />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

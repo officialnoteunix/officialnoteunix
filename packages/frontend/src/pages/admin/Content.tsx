@@ -4,6 +4,7 @@ import { courseApi } from '../../api/course';
 import { semesterApi } from '../../api/semester';
 import { subjectApi } from '../../api/subject';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { emitStatsRefresh } from '../../utils/statsRefresh';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import {
@@ -35,6 +36,8 @@ type ViewMode = 'browse' | 'form';
 
 export default function Content() {
   const { showToast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const [universities, setUniversities] = useState<Entity[]>([]);
   const [courses, setCourses] = useState<Entity[]>([]);
@@ -280,10 +283,12 @@ export default function Content() {
                     className="btn-rounded btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5, display: 'flex', gap: 3, alignItems: 'center' }}>
                     <Edit2 size={10} /> Edit
                   </button>
+                  {isAdmin && (
                   <button onClick={e => { e.stopPropagation(); setDeleteTarget(item); }}
                     className="btn-rounded" style={{ padding: '4px 10px', fontSize: 10.5, display: 'flex', gap: 3, alignItems: 'center', backgroundColor: 'var(--danger)', color: '#fff' }}>
                     <Trash2 size={10} /> Delete
                   </button>
+                  )}
                 </div>
               </div>
             );
