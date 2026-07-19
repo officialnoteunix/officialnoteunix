@@ -11,6 +11,7 @@ import {
 import NotificationBell from '../notification/NotificationBell';
 import LogoutModal from '../ui/LogoutModal';
 import { useNotificationCount } from '../../context/NotificationContext';
+import { firstMaintainerPath } from '../layout/MaintainerLayout';
 
 export default function UserLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -48,6 +49,7 @@ export default function UserLayout() {
   ];
 
   const showMaintainerLink = user?.role === 'maintainer' || user?.role === 'admin';
+  const moderatorDefault = firstMaintainerPath(user?.permissions, user?.role);
 
   const currentPage = links.find(l => l.to === pathname)?.label || 'Dashboard';
   const seenCategories = new Set<string>();
@@ -96,7 +98,7 @@ export default function UserLayout() {
         <div>
           <div className="sidebar-section">Staff</div>
           <NavLink
-            to="/maintainer/notes"
+            to={moderatorDefault}
             className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
           >
             <Shield size={20} />

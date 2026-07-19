@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLocalStorage, useLocalStorageNum } from '../../utils/useLocalStorage';
@@ -44,6 +44,7 @@ export default function MaintainerLayout() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
 
   const isAdmin = user?.role === 'admin';
   const perms = user?.permissions || [];
@@ -177,6 +178,15 @@ export default function MaintainerLayout() {
               aria-label="Toggle theme"
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <button
+              onClick={() => navigate('/user/dashboard')}
+              className="btn-rounded btn-ghost"
+              style={{ padding: '8px 16px', display: 'flex', gap: 8, fontSize: 13 }}
+              title="Return to student view"
+            >
+              <ChevronLeft size={14} />
+              <span>Exit Panel</span>
             </button>
             <button
               onClick={() => setShowLogout(true)}
