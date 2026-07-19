@@ -31,18 +31,12 @@ export function getThumbnailUrl(url: string | undefined, fileType?: string, thum
 }
 
 // Build a URL suitable for inline preview (iframe/embed) rather than download.
-// For PDFs we append Cloudinary's `fl_inline` flag so the file is served with
-// Content-Disposition: inline (otherwise bare PDF URLs prompt a download).
+// PDFs and Office files are routed through the Google Docs viewer, which reliably
+// renders inline across browsers (bare Cloudinary PDF URLs prompt a download).
 export function getPreviewUrl(url: string | undefined, fileType?: string): string | undefined {
   if (!url) return undefined;
   const ft = (fileType || '').toLowerCase();
-  if (ft === 'pdf' || /\.pdf($|\?)/i.test(url)) {
-    if (url.includes('/upload/') && !url.includes('fl_inline')) {
-      return url.replace('/upload/', '/upload/fl_inline/');
-    }
-    return url;
-  }
-  if (isOfficeFile(ft)) {
+  if (ft === 'pdf' || /\.pdf($|\?)/i.test(url) || isOfficeFile(ft)) {
     return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
   }
   return url;
