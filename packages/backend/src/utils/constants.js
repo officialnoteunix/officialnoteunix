@@ -16,6 +16,7 @@ export const PERMISSIONS = {
   ANALYTICS_VIEW: 'analytics:view',     // view dashboards
   TAXONOMY_EDIT: 'taxonomy:edit',        // create/edit university/course/semester/subject
   AD_MANAGE: 'ad:manage',               // create/edit ads
+  FEED_MODERATE: 'feed:moderate',        // delete/moderate any community post
 };
 
 // Default permission set granted to a maintainer on promotion (admin can customize).
@@ -28,6 +29,7 @@ export const DEFAULT_MAINTAINER_PERMISSIONS = [
   PERMISSIONS.ANALYTICS_VIEW,
   PERMISSIONS.TAXONOMY_EDIT,
   PERMISSIONS.AD_MANAGE,
+  PERMISSIONS.FEED_MODERATE,
 ];
 
 // Permissions that must NEVER be granted to a maintainer (reserved for admin only).

@@ -30,6 +30,7 @@ export default function Header() {
       <div className="nav-center">
         <Link to="/" className={`nav-link ${isActive('/')}`} aria-current={pathname === '/' ? 'page' : undefined}>Home</Link>
         <Link to="/notes" className={`nav-link ${isActive('/notes')}`} aria-current={pathname === '/notes' ? 'page' : undefined}>Browse</Link>
+        <Link to="/community" className={`nav-link ${isActive('/community')}`} aria-current={pathname.startsWith('/community') ? 'page' : undefined}>Community</Link>
         <Link to="/contact" className={`nav-link ${isActive('/contact')}`} aria-current={pathname === '/contact' ? 'page' : undefined}>Contact</Link>
       </div>
       <div className="nav-actions">

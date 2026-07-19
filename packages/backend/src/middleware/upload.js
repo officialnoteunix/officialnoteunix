@@ -46,6 +46,8 @@ const ALLOWED_MIMES = [
 ];
 
 const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const ALLOWED_VIDEO_MIMES = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
+const ALLOWED_MEDIA_MIMES = [...ALLOWED_IMAGE_MIMES, ...ALLOWED_VIDEO_MIMES];
 
 const fileFilter = (req, file, cb) => {
   if (ALLOWED_MIMES.includes(file.mimetype)) {
@@ -75,4 +77,16 @@ export const uploadImage = multer({
   storage,
   fileFilter: imageFilter,
   limits: { fileSize: MAX_IMAGE_SIZE },
+});
+
+export const uploadMedia = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MEDIA_MIMES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images (JPEG, PNG, GIF, WebP) and videos (MP4, WebM, OGG, MOV) are allowed'), false);
+    }
+  },
+  limits: { fileSize: MAX_FILE_SIZE },
 });

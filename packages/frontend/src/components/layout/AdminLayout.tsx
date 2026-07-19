@@ -8,7 +8,7 @@ import { useStatsRefresh } from '../../utils/statsRefresh';
 import {
    LayoutDashboard, BookOpen, FileText, Users, Flag,
   LogOut, Sun, Moon, ChevronLeft, ChevronRight, Megaphone,   MessageSquare, Menu, X,
-  BarChart3, MessageCircle, Shield, Bell, Mail as MailIcon
+  BarChart3, MessageCircle, Shield, Bell, Mail as MailIcon, ShieldAlert
 } from 'lucide-react';
 import NotificationBell from '../notification/NotificationBell';
 import LogoutModal from '../ui/LogoutModal';
@@ -65,6 +65,7 @@ export default function AdminLayout() {
     { to: '/admin/reports', label: 'Reports', icon: Flag, category: 'Moderation', badge: badgeNew(stats.pendingReports, seenReports) },
     { to: '/admin/ads', label: 'Ads', icon: Megaphone, category: 'Moderation' },
     { to: '/admin/comments', label: 'Comments', icon: MessageCircle, category: 'Moderation' },
+    { to: '/admin/community', label: 'Community', icon: ShieldAlert, category: 'Moderation' },
     { to: '/admin/messages', label: 'Messages', icon: MessageSquare, category: 'Moderation', badge: badgeNew(stats.unreadContactMessages, seenMessages) },
     { to: '/admin/audit-logs', label: 'Audit Logs', icon: Shield, category: 'Moderation', badge: badgeNew(stats.recentAuditLogs, seenAudit) },
     { to: '/admin/mail', label: 'Mail', icon: MailIcon, category: 'Support' },

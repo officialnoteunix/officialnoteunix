@@ -8,7 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LabelList,
 } from 'recharts';
-import { Upload, Bookmark, FileText, BookOpen, ArrowRight, Download } from 'lucide-react';
+import { Upload, Bookmark, FileText, BookOpen, ArrowRight, Download, Users, Megaphone } from 'lucide-react';
 
 const PIE_COLORS = ['var(--palette-1)', 'var(--palette-4)'];
 
@@ -68,12 +68,14 @@ export default function Dashboard() {
     { label: 'Total Notes', value: stats?.totalNotes || 0, icon: FileText, paletteIdx: 0, to: '/user/my-notes' },
     { label: 'Bookmarks', value: stats?.totalBookmarks || 0, icon: Bookmark, paletteIdx: 1, to: '/user/bookmarks' },
     { label: 'Downloads', value: stats?.totalDownloads || 0, icon: Download, paletteIdx: 2, to: '/user/my-notes' },
+    { label: 'Following', value: user?.followingCount || 0, icon: Users, paletteIdx: 3, to: `/community/${user?.username || user?.id}` },
   ];
 
   const quickActions = [
     { to: '/user/upload', label: 'Upload Note', icon: Upload, desc: 'Share your study materials' },
     { to: '/user/browse', label: 'Browse Notes', icon: BookOpen, desc: 'Discover notes from peers' },
     { to: '/user/bookmarks', label: 'Bookmarks', icon: Bookmark, desc: 'View your saved notes' },
+    { to: '/community', label: 'Community Feed', icon: Megaphone, desc: 'Post, follow and explore the social feed' },
   ];
 
   return (
@@ -252,6 +254,26 @@ export default function Dashboard() {
               <Link to="/user/upload" style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600, textDecoration: 'none', marginTop: 8, display: 'inline-block' }}>Upload your first note</Link>
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="content-card" style={{ padding: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 46, height: 46, borderRadius: 12, background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Megaphone size={22} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-heading)', margin: 0 }}>Your Community</h3>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                {user?.username ? `@${user.username}` : 'Set a username'} · {user?.followersCount || 0} followers
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Link to="/community" className="btn-rounded btn-primary" style={{ fontSize: 13, padding: '8px 16px' }}>Open Feed</Link>
+            <Link to={`/community/${user?.username || user?.id}`} className="btn-rounded btn-outline" style={{ fontSize: 13, padding: '8px 16px' }}>My Profile</Link>
+          </div>
         </div>
       </div>
 

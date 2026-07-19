@@ -10,6 +10,10 @@ interface User {
   avatar: string | null;
   banned: boolean;
   emailVerified: boolean;
+  username?: string | null;
+  bio?: string;
+  followersCount?: number;
+  followingCount?: number;
   createdAt: string;
 }
 

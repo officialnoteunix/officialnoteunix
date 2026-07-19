@@ -18,6 +18,7 @@ import contactRoutes from './contactRoutes.js';
 import commentRoutes from './commentRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
 import ratingRoutes from './ratingRoutes.js';
+import feedRoutes from './feedRoutes.js';
 const router = Router();
 
 router.use('/auth', authRoutes);
@@ -39,6 +40,7 @@ router.use('/contact', contactRoutes);
 router.use('/comments', commentRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/ratings', ratingRoutes);
+router.use('/feed', feedRoutes);
 
 router.get('/health', (req, res) => {
   res.json({ success: true, message: 'OK' });

@@ -35,6 +35,9 @@ const Privacy = lazy(() => import('./pages/Privacy'));
 const Terms = lazy(() => import('./pages/Terms'));
 const Contact = lazy(() => import('./pages/Contact'));
 const Support = lazy(() => import('./pages/Support'));
+const CommunityFeed = lazy(() => import('./pages/community/CommunityFeed'));
+const PostDetail = lazy(() => import('./pages/community/PostDetail'));
+const CommunityProfile = lazy(() => import('./pages/community/CommunityProfile'));
 const UserDashboard = lazy(() => import('./pages/user/Dashboard'));
 const UserBrowse = lazy(() => import('./pages/user/Browse'));
 const UserProfile = lazy(() => import('./pages/user/Profile'));
@@ -55,6 +58,7 @@ const AdminComments = lazy(() => import('./pages/admin/Comments'));
 const AdminAuditLogs = lazy(() => import('./pages/admin/AuditLogs'));
 const AdminMail = lazy(() => import('./pages/admin/Mail'));
 const UserDetail = lazy(() => import('./pages/admin/UserDetail'));
+const CommunityModeration = lazy(() => import('./pages/admin/CommunityModeration'));
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>;
@@ -82,6 +86,9 @@ export default function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/support" element={<Support />} />
+          <Route path="/community" element={<CommunityFeed />} />
+          <Route path="/community/post/:id" element={<PostDetail />} />
+          <Route path="/community/:id" element={<CommunityProfile />} />
         </Route>
 
         <Route path="/login" element={<Login />} />
@@ -131,6 +138,7 @@ export default function App() {
           <Route path="messages" element={<AdminMessages />} />
           <Route path="audit-logs" element={<AdminAuditLogs />} />
           <Route path="mail" element={<AdminMail />} />
+          <Route path="community" element={<CommunityModeration />} />
           <Route path="notifications" element={<Notifications />} />
         </Route>
 
@@ -150,6 +158,7 @@ export default function App() {
           <Route path="ads" element={<AdminAds />} />
           <Route path="content" element={<AdminContent />} />
           <Route path="analytics" element={<AdminAnalytics />} />
+          <Route path="community" element={<CommunityModeration />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

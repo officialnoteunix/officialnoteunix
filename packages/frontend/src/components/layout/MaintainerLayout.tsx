@@ -7,7 +7,7 @@ import { useStatsRefresh } from '../../utils/statsRefresh';
 import {
   LayoutDashboard, BookOpen, FileText, Flag,
   LogOut, Sun, Moon, ChevronLeft, ChevronRight,
-  Megaphone, MessageSquare, Menu, X, BarChart3, MessageCircle, Shield, UserCog,
+  Megaphone, MessageSquare, Menu, X, BarChart3, MessageCircle, Shield, UserCog, ShieldAlert,
 } from 'lucide-react';
 import LogoutModal from '../ui/LogoutModal';
 
@@ -23,6 +23,7 @@ interface MaintainerLink {
 export const MAINTAINER_LINKS: MaintainerLink[] = [
   { to: '/maintainer/notes', label: 'Notes', icon: FileText, category: 'Moderation', perm: 'note:moderate' },
   { to: '/maintainer/comments', label: 'Comments', icon: MessageCircle, category: 'Moderation', perm: 'comment:moderate' },
+  { to: '/maintainer/community', label: 'Community', icon: ShieldAlert, category: 'Moderation', perm: 'feed:moderate' },
   { to: '/maintainer/reports', label: 'Reports', icon: Flag, category: 'Moderation', perm: 'report:manage' },
   { to: '/maintainer/messages', label: 'Messages', icon: MessageSquare, category: 'Moderation', perm: 'contact:manage' },
   { to: '/maintainer/ads', label: 'Ads', icon: Megaphone, category: 'Content', perm: 'ad:manage' },

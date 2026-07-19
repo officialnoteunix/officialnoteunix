@@ -29,6 +29,10 @@ const userSchema = new mongoose.Schema({
   emailVerified: { type: Boolean, default: false },
   emailVerifyToken: { type: String, default: null },
   emailVerifyExpiry: { type: Date, default: null },
+  username: { type: String, unique: true, sparse: true, lowercase: true, trim: true, match: /^[a-z0-9_]{3,20}$/ },
+  bio: { type: String, default: '', maxlength: 160 },
+  followersCount: { type: Number, default: 0, min: 0 },
+  followingCount: { type: Number, default: 0, min: 0 },
 }, { timestamps: true });
 
 userSchema.methods.comparePassword = async function (password) {
@@ -47,6 +51,10 @@ userSchema.methods.toPublicJSON = function () {
     banned: this.banned,
     suspendedUntil: this.suspendedUntil,
     emailVerified: this.emailVerified,
+    username: this.username || null,
+    bio: this.bio || '',
+    followersCount: this.followersCount || 0,
+    followingCount: this.followingCount || 0,
     createdAt: this.createdAt,
   };
 };

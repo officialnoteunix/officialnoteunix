@@ -1,12 +1,18 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Mail, Shield, Calendar, Camera, User } from 'lucide-react';
 import { userApi } from '../../api/user';
+import { feedApi } from '../../api/feed';
 import { useToast } from '../../context/ToastContext';
 import { getApiError } from '../../utils/constants';
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
   const { showToast } = useToast();
+  const [username, setUsername] = useState(user?.username || '');
+  const [bio, setBio] = useState(user?.bio || '');
+  const [saving, setSaving] = useState(false);
 
   const handleAvatarClick = async () => {
     const input = document.createElement('input');
@@ -88,6 +94,58 @@ export default function Profile() {
               <span className="profile-info-value">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Community Profile Card */}
+      <div className="content-card" style={{ flex: '1 1 360px', padding: 32, alignSelf: 'start' }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, fontFamily: 'var(--font-heading)' }}>Community Profile</h3>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+          This is your public identity in the <Link to="/community" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Community feed</Link>.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label className="profile-info-label" style={{ marginBottom: 6, display: 'block' }}>Username</label>
+            <input
+              className="form-input"
+              value={username}
+              maxLength={20}
+              placeholder="username"
+              onChange={(e) => setUsername(e.target.value.replace(/\s/g, '').toLowerCase())}
+            />
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>3–20 chars: lowercase letters, numbers, underscore. Used at /community/@{username || 'you'}</span>
+          </div>
+          <div>
+            <label className="profile-info-label" style={{ marginBottom: 6, display: 'block' }}>Bio</label>
+            <textarea
+              className="form-input"
+              value={bio}
+              maxLength={160}
+              rows={3}
+              placeholder="Tell the community about yourself..."
+              onChange={(e) => setBio(e.target.value)}
+            />
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{bio.length}/160</span>
+          </div>
+          <button
+            className="btn-rounded btn-primary"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await feedApi.updateProfile({ username: username || undefined, bio });
+                await refreshUser();
+                showToast('success', 'Community profile updated');
+              } catch (err) {
+                showToast('error', getApiError(err, 'Update failed'));
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving ? 'Saving...' : 'Save Community Profile'}
+          </button>
         </div>
       </div>
     </div>
