@@ -7,7 +7,7 @@ import { ratingApi } from '../api/rating';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getApiError } from '../utils/constants';
-import { getThumbnailUrl } from '../utils/cloudinary';
+import { getThumbnailUrl, getPreviewUrl } from '../utils/cloudinary';
 import FileTypePlaceholder from '../components/ui/FileTypePlaceholder';
 import Modal from '../components/ui/Modal';
 import StarRating from '../components/ui/StarRating';
@@ -246,10 +246,10 @@ export default function NoteDetail() {
                 return <img src={f.url} alt={note.title} className="note-preview-img" />;
               }
               if (f.fileType === 'pdf') {
-                return <iframe src={f.url} className="note-preview-frame" title="Note Preview" />;
+                return <iframe src={getPreviewUrl(f.url, 'pdf')} className="note-preview-frame" title="Note Preview" />;
               }
               if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'odt', 'ods', 'odp'].includes(f.fileType)) {
-                return <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(f.url)}&embedded=true`} className="note-preview-frame" title="Note Preview" />;
+                return <iframe src={getPreviewUrl(f.url, f.fileType)} className="note-preview-frame" title="Note Preview" />;
               }
               return <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
                 <FileText size={48} style={{ marginBottom: 12 }} />
