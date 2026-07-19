@@ -17,7 +17,8 @@ export interface User {
   _id: string;
   fullname: string;
   email: string;
-  role: 'student' | 'admin';
+  role: 'student' | 'maintainer' | 'admin';
+  permissions?: string[];
   avatar: string | null;
   isVerified?: boolean;
   banned: boolean;

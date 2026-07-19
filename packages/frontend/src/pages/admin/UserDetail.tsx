@@ -5,7 +5,14 @@ import { useToast } from '../../context/ToastContext';
 import { emitStatsRefresh } from '../../utils/statsRefresh';
 import { useAuth } from '../../context/AuthContext';
 import type { UserDetail as UserDetailType, Note } from '../../types';
-import { ArrowLeft, Users, FileText, Bookmark, Download, Mail, Calendar, Shield, Ban, CheckCircle, Timer, ShieldOff, BadgeCheck } from 'lucide-react';
+import {
+  MAINTAINER_PERMISSIONS,
+  DEFAULT_MAINTAINER_PERMISSIONS,
+  ROLE_LABELS,
+  type Permission,
+  type UserRole,
+} from '../../utils/constants';
+import { ArrowLeft, Users, FileText, Bookmark, Download, Mail, Calendar, Shield, Ban, CheckCircle, Timer, ShieldOff, BadgeCheck, UserCog, Crown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import RestrictModal from '../../components/ui/RestrictModal';
@@ -128,6 +135,43 @@ export default function UserDetail() {
     }
   }, [user, showToast]);
 
+  const isSelf = currentUser?.id === user?._id;
+  const canManageRole = currentUser?.role === 'admin' && !isSelf && user?.role !== 'admin';
+  const [rolePanelOpen, setRolePanelOpen] = useState(false);
+  const [roleForm, setRoleForm] = useState<UserRole>('student');
+  const [permForm, setPermForm] = useState<Permission[]>([]);
+  const [roleSaving, setRoleSaving] = useState(false);
+
+  const openRolePanel = useCallback(() => {
+    if (!user) return;
+    setRoleForm(user.role === 'maintainer' ? 'maintainer' : 'student');
+    setPermForm((user.permissions && user.permissions.length ? user.permissions : DEFAULT_MAINTAINER_PERMISSIONS) as Permission[]);
+    setRolePanelOpen(true);
+  }, [user]);
+
+  const togglePerm = useCallback((key: Permission) => {
+    setPermForm(prev => prev.includes(key) ? prev.filter(p => p !== key) : [...prev, key]);
+  }, []);
+
+  const handleSaveRole = useCallback(async () => {
+    if (!user) return;
+    setRoleSaving(true);
+    try {
+      const payload = roleForm === 'maintainer'
+        ? { role: roleForm, permissions: permForm }
+        : { role: roleForm as Exclude<UserRole, 'admin'> };
+      const res = await adminApi.setUserRole(user._id, payload);
+      setUser(prev => prev ? { ...prev, role: res.data.data.role, permissions: res.data.data.permissions } : prev);
+      showToast('success', `${user.fullname} is now ${ROLE_LABELS[res.data.data.role]}`);
+      setRolePanelOpen(false);
+      emitStatsRefresh();
+    } catch (err) {
+      showToast('error', getApiError(err, 'Failed to update role'));
+    } finally {
+      setRoleSaving(false);
+    }
+  }, [user, roleForm, permForm, showToast]);
+
   const notesChart = useMemo(() => user?.notesByMonth ? fillMonths(user.notesByMonth) : [], [user]);
 
   if (loading) return <div className="loading-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>;
@@ -220,6 +264,47 @@ export default function UserDetail() {
           <Calendar size={14} /> Joined {new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
         </span>
       </div>
+
+      {currentUser?.role === 'admin' && !isSelf && user.role !== 'admin' && (
+        <div className="content-card" style={{ padding: 24, marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--palette-0-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--palette-0)' }}>
+                <UserCog size={16} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-heading)' }}>Role & Permissions</h3>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {user.role === 'maintainer'
+                    ? `${user.permissions?.length || 0} permission(s) granted`
+                    : 'Currently a student account'}
+                </p>
+              </div>
+            </div>
+            <button onClick={openRolePanel} className="btn-rounded" style={{ padding: '7px 14px', fontSize: 12, backgroundColor: user.role === 'maintainer' ? 'var(--bg-subtle)' : 'var(--primary)', color: user.role === 'maintainer' ? 'var(--text-main)' : '#fff', display: 'flex', gap: 4, alignItems: 'center', border: user.role === 'maintainer' ? '1px solid var(--border-color)' : 'none' }}>
+              <UserCog size={13} />
+              {user.role === 'maintainer' ? 'Edit Access' : 'Promote to Maintainer'}
+            </button>
+          </div>
+
+          {user.role === 'maintainer' && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {(user.permissions && user.permissions.length ? user.permissions : DEFAULT_MAINTAINER_PERMISSIONS).map(perm => {
+                const def = MAINTAINER_PERMISSIONS.find(p => p.key === perm);
+                return (
+                  <span key={perm} className="badge badge-ghost" style={{ fontSize: 11 }}>{def ? def.label : perm}</span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {currentUser?.role === 'admin' && user.role === 'admin' && (
+        <div className="content-card" style={{ padding: 20, marginBottom: 28, display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-muted)', fontSize: 13 }}>
+          <Crown size={16} style={{ color: 'var(--primary)' }} /> This is an administrator account. Role cannot be changed here.
+        </div>
+      )}
 
       <div className="grid-2" style={{ marginBottom: 28 }}>
         <div className="content-card" style={{ padding: 24 }}>
@@ -325,6 +410,61 @@ export default function UserDetail() {
       </div>
         );
       })()}
+
+      {rolePanelOpen && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }} onClick={() => !roleSaving && setRolePanelOpen(false)}>
+          <div className="content-card" style={{ padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 17, fontWeight: 800, fontFamily: 'var(--font-heading)', marginBottom: 4 }}>Manage Role</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 18 }}>{user.fullname}</p>
+
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 8 }}>Role</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              {(['student', 'maintainer'] as UserRole[]).map(r => (
+                <button
+                  key={r}
+                  onClick={() => setRoleForm(r)}
+                  className="btn-rounded"
+                  style={{
+                    flex: 1, padding: '10px 12px', fontSize: 13, fontWeight: 600,
+                    backgroundColor: roleForm === r ? 'var(--primary)' : 'var(--bg-subtle)',
+                    color: roleForm === r ? '#fff' : 'var(--text-main)',
+                    border: roleForm === r ? 'none' : '1px solid var(--border-color)',
+                  }}
+                >
+                  {r === 'maintainer' ? 'Maintainer' : 'Student'}
+                </button>
+              ))}
+            </div>
+
+            {roleForm === 'maintainer' && (
+              <>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 10 }}>Permissions</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                  {MAINTAINER_PERMISSIONS.map(p => {
+                    const checked = permForm.includes(p.key);
+                    return (
+                      <label key={p.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', background: 'var(--bg-subtle)', borderRadius: 8, cursor: 'pointer', border: '1px solid transparent' }}>
+                        <input type="checkbox" checked={checked} onChange={() => togglePerm(p.key)} style={{ marginTop: 2, accentColor: 'var(--primary)' }} />
+                        <span>
+                          <span style={{ fontSize: 13, fontWeight: 600, display: 'block' }}>{p.label}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.description}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => !roleSaving && setRolePanelOpen(false)} className="btn-rounded btn-ghost" style={{ padding: '9px 16px', fontSize: 13 }}>Cancel</button>
+              <button onClick={handleSaveRole} disabled={roleSaving} className="btn-rounded" style={{ padding: '9px 18px', fontSize: 13, backgroundColor: 'var(--primary)', color: '#fff', opacity: roleSaving ? 0.6 : 1 }}>
+                {roleSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <RestrictModal
         open={!!restrictTarget}

@@ -1,5 +1,16 @@
 import api from './axios';
 import type { APIResponse, PaginatedData, User, UserDetail, Note, AuditLog } from '../types';
+import type { Permission, UserRole } from '../utils/constants';
+
+export interface SetRolePayload {
+  role: UserRole;
+  permissions?: Permission[];
+}
+
+export interface PermissionsResponse {
+  permissions: { key: string; label: string; description: string }[];
+  defaultMaintainer: string[];
+}
 
 export const adminApi = {
   stats: () => api.get<APIResponse<any>>('/admin/stats'),
@@ -38,4 +49,8 @@ export const adminApi = {
     api.post<APIResponse<{ sent: number; failed: number; errors: Array<{ email: string; error: string }>; retryHours?: number }>>('/admin/send-email', data),
   replyContact: (id: string, replyContent: string) =>
     api.post<APIResponse<any>>(`/admin/contact/${id}/reply`, { replyContent }),
+  permissions: () =>
+    api.get<APIResponse<PermissionsResponse>>('/admin/permissions'),
+  setUserRole: (id: string, payload: SetRolePayload) =>
+    api.patch<APIResponse<User>>(`/admin/users/${id}/role`, payload),
 };

@@ -77,3 +77,40 @@ export function getApiError(err: unknown, fallback = 'Something went wrong'): st
 
   return fallback;
 }
+
+export type UserRole = 'student' | 'maintainer' | 'admin';
+
+export type Permission =
+  | 'note:moderate'
+  | 'comment:moderate'
+  | 'report:manage'
+  | 'contact:manage'
+  | 'note:create'
+  | 'analytics:view'
+  | 'taxonomy:edit'
+  | 'ad:manage';
+
+export interface PermissionDef {
+  key: Permission;
+  label: string;
+  description: string;
+}
+
+export const MAINTAINER_PERMISSIONS: PermissionDef[] = [
+  { key: 'note:moderate', label: 'Moderate Notes', description: 'Approve, reject, edit or delete any note' },
+  { key: 'comment:moderate', label: 'Moderate Comments', description: 'List and delete any comment' },
+  { key: 'report:manage', label: 'Manage Reports', description: 'View, resolve or dismiss reports' },
+  { key: 'contact:manage', label: 'Manage Messages', description: 'View, read, reply to and delete contact messages' },
+  { key: 'note:create', label: 'Create Notes', description: 'Upload notes on behalf of the platform' },
+  { key: 'analytics:view', label: 'View Analytics', description: 'Access dashboards and stats' },
+  { key: 'taxonomy:edit', label: 'Edit Taxonomy', description: 'Create or edit university, course, semester and subject' },
+  { key: 'ad:manage', label: 'Manage Ads', description: 'Create and edit advertisements' },
+];
+
+export const DEFAULT_MAINTAINER_PERMISSIONS: Permission[] = MAINTAINER_PERMISSIONS.map(p => p.key);
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  student: 'Student',
+  maintainer: 'Maintainer',
+  admin: 'Admin',
+};
