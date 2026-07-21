@@ -9,7 +9,7 @@ import BackToTop from '../ui/BackToTop';
 export default function PublicLayout() {
   const { pathname } = useLocation();
   const isLanding = pathname === '/';
-  const hideFooter = pathname === '/notes' || pathname.startsWith('/notes/');
+  const hideFooter = pathname === '/notes' || pathname.startsWith('/notes/') || pathname.startsWith('/subjects/');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>

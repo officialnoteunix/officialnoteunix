@@ -217,6 +217,14 @@ router.get('/google/callback', (req, res, next) => {
     
     if (err || !user) {
       console.error('[AUTH] Google OAuth Callback Error:', err || info);
+      if (info?.banned) {
+        const params = new URLSearchParams();
+        params.set('error', 'banned');
+        params.set('message', info.message || 'Account has been banned');
+        if (info.suspended) params.set('suspended', 'true');
+        if (info.remaining) params.set('remaining', info.remaining);
+        return res.redirect(`${frontendUrl}/login?${params.toString()}`);
+      }
       const redirectUrl = `${frontendUrl}/login?error=oauth_failed`;
       return res.redirect(redirectUrl);
     }

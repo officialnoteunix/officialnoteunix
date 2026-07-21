@@ -12,8 +12,12 @@ export default function Contact() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.message) {
+    if (!form.name.trim() || !form.email.trim() || !form.message.trim()) {
       showToast('error', 'Please fill in all required fields');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      showToast('error', 'Please enter a valid email address');
       return;
     }
     setLoading(true);
@@ -39,7 +43,7 @@ export default function Contact() {
           <div className="contact-grid">
             <div className="faq-grid">
               {[
-                { icon: <Mail size={20} />, title: 'Email', text: 'official@noteunix.com', desc: 'We reply within 24 hours' },
+                { icon: <Mail size={20} />, title: 'Email', text: 'official@noteunix.com', href: 'mailto:official@noteunix.com', desc: 'We reply within 24 hours' },
                 { icon: <MapPin size={20} />, title: 'Location', text: 'Kathmandu, Nepal', desc: 'Virtual team' },
                 { icon: <Clock size={20} />, title: 'Response Time', text: 'Mon–Fri, 9AM–6PM', desc: 'Nepal Time (UTC+5:45)' },
                 { icon: <MessageSquare size={20} />, title: 'Social', text: '@noteunix', desc: 'Follow us for updates' },
@@ -54,7 +58,11 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{item.title}</h3>
-                    <p style={{ fontSize: 13, color: 'var(--text-main)', fontWeight: 500 }}>{item.text}</p>
+                    {'href' in item && item.href ? (
+                      <a href={item.href} style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500, textDecoration: 'none' }}>{item.text}</a>
+                    ) : (
+                      <p style={{ fontSize: 13, color: 'var(--text-main)', fontWeight: 500 }}>{item.text}</p>
+                    )}
                     <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{item.desc}</p>
                   </div>
                 </div>

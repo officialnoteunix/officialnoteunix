@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext';
 import LoadingSpinner from './components/ui/LoadingSpinner';
 import LandingSkeleton from './components/skeletons/LandingSkeleton';
 import RateLimitBanner from './components/ui/RateLimitBanner';
+import NetworkBanner from './components/ui/NetworkBanner';
 import PublicLayout from './components/layout/PublicLayout';
 import UserLayout from './components/layout/UserLayout';
 import AdminLayout from './components/layout/AdminLayout';
@@ -23,12 +24,12 @@ const Register = lazy(() => import('./pages/Register'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
-const Browse = lazy(() => import('./pages/Browse'));
+const DiscoverBrowse = lazy(() => import('./pages/DiscoverBrowse'));
 const NoteDetail = lazy(() => import('./pages/NoteDetail'));
 const UniversityDetail = lazy(() => import('./pages/UniversityDetail'));
 const CourseDetail = lazy(() => import('./pages/CourseDetail'));
 const SemesterDetail = lazy(() => import('./pages/SemesterDetail'));
-const SubjectDetail = lazy(() => import('./pages/SubjectDetail'));
+const SubjectPage = lazy(() => import('./pages/SubjectPage'));
 const Leaderboard = lazy(() => import('./pages/Leaderboard'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Privacy = lazy(() => import('./pages/Privacy'));
@@ -39,7 +40,7 @@ const CommunityFeed = lazy(() => import('./pages/community/CommunityFeed'));
 const PostDetail = lazy(() => import('./pages/community/PostDetail'));
 const CommunityProfile = lazy(() => import('./pages/community/CommunityProfile'));
 const UserDashboard = lazy(() => import('./pages/user/Dashboard'));
-const UserBrowse = lazy(() => import('./pages/user/Browse'));
+const DiscoverBrowseUser = lazy(() => import('./pages/DiscoverBrowse'));
 const UserProfile = lazy(() => import('./pages/user/Profile'));
 const UserBookmarks = lazy(() => import('./pages/user/Bookmarks'));
 const UserMyNotes = lazy(() => import('./pages/user/MyNotes'));
@@ -72,15 +73,16 @@ export default function App() {
   return (
     <SuspenseWrapper>
       <RateLimitBanner />
+      <NetworkBanner />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Suspense fallback={<LandingSkeleton />}><Landing /></Suspense>} />
-          <Route path="/notes" element={<Browse />} />
+          <Route path="/notes" element={<DiscoverBrowse />} />
           <Route path="/notes/:id" element={<NoteDetail />} />
           <Route path="/universities/:id" element={<UniversityDetail />} />
           <Route path="/courses/:id" element={<CourseDetail />} />
           <Route path="/semesters/:id" element={<SemesterDetail />} />
-          <Route path="/subjects/:id" element={<SubjectDetail />} />
+          <Route path="/subjects/:id" element={<SubjectPage />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
@@ -108,7 +110,7 @@ export default function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<UserDashboard />} />
           <Route path="profile" element={<UserProfile />} />
-          <Route path="browse" element={<UserBrowse />} />
+          <Route path="browse" element={<DiscoverBrowseUser />} />
           <Route path="bookmarks" element={<UserBookmarks />} />
           <Route path="my-notes" element={<UserMyNotes />} />
           <Route path="upload" element={<UserUpload />} />

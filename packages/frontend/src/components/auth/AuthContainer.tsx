@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getApiError } from '../../utils/constants';
@@ -29,6 +29,29 @@ export default function AuthContainer({ initialView = 'login' }: AuthContainerPr
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam === 'banned') {
+      const message = searchParams.get('message') || 'Account has been banned';
+      const suspended = searchParams.get('suspended');
+      const remaining = searchParams.get('remaining');
+      if (suspended && remaining) {
+        const diff = new Date(remaining).getTime() - Date.now();
+        if (diff > 0) {
+          const h = Math.floor(diff / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          setError(`Account suspended — ${h > 0 ? `${h}h ${m}m` : `${m}m`} remaining`);
+        } else {
+          setError(message);
+        }
+      } else {
+        setError(message);
+      }
+    } else if (errorParam === 'oauth_failed') {
+      setError('Google sign-in failed. Please try again.');
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

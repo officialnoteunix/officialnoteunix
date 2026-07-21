@@ -25,6 +25,14 @@ export default function configurePassport() {
           user.emailVerified = true;
           await user.save();
         }
+
+        const cleared = user.clearSuspension();
+        if (user.banned && !cleared) {
+          const suspended = user.suspendedUntil && new Date(user.suspendedUntil).getTime() > Date.now();
+          const msg = suspended ? 'Account is suspended' : 'Account has been banned permanently';
+          return done(null, false, { message: msg, banned: true, suspended: suspended || false, remaining: suspended ? user.suspendedUntil.toISOString() : null });
+        }
+
         done(null, user);
       } catch (err) {
         done(err, null);
